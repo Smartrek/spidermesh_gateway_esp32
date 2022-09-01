@@ -1,0 +1,2385 @@
+#include "Spidermesh.h"
+#include <smk900.h>
+
+#define SKIP_NODE_WHEN_MISSING_PAGE_OLD_VERSION false
+#define FORCE_UNICAST_SENDING_MISSING_FLAG true
+
+#define SIM_MISSING_PACKET_SCRATCH false
+#define SIM_MISSING_PACKET_SCRATCH_BIT (0x0002)
+#define NB_RETRY_SAME_SCRATCH_LOST 3
+
+#define SKIP_BULKUPLOAD false
+#define SIM_SKIP_SOME_BROADCAST_UPLOAD false
+#define SIM_SKIP_SOME_BROADCAST_UPLOAD_EVERY 200
+
+#define SIMULATION NO_SIMULATION
+//#define SIMULATION FULL_SIMULATION
+//#define SIMULATION SIMULATION_END
+
+//#ifdef SIMULATION == NO_SIMULATION
+
+#define SIMULATION_BULKUPLOAD false
+#define SIMULATION_GETMISSINGFLAGS false
+#define SIMULATION_MISSINGFLAGS_ERROR false
+#define SIMULATION_PRUNE_VALID_PAGES false
+#define SIMULATION_CHECK_IF_CRC_OK false
+#define SIMULATION_SEND_META_DATA false
+#define SIMULATION_RESET_NODE_ON_SEEK false
+#define SIMULATION_SEND_MAGICWORD false
+
+#define SIMULATION_ABORT_UPDATE false
+#define SIMULATION_SLOW_DYN_FOR_SIM_BUTTON false
+#define SIMULATION_RESET_FACTORY_PYBOARD false
+#define SIMULATION_PYBOARD_CHECK_PROGRESS false
+
+
+#define EXPECTED_PRESET_RF_AT_BOOT PRESET_20B
+
+
+bool Spidermesh::doProcessState;
+ota_mode_t Spidermesh::current_mode;
+ota_state Spidermesh::current_state;
+ota_state Spidermesh::next_state;
+int32_t Spidermesh::current_sub_state;
+uint64_t Spidermesh::step_start_time;
+
+uint64_t Spidermesh::chrono_ms;
+
+uint64_t Spidermesh::otaTimeout_ms;
+bool Spidermesh::wait_eob;
+int Spidermesh::wait_eob_count;
+
+
+JsonObject Spidermesh::log;
+String Spidermesh::otaResult;
+bool Spidermesh::initDone=false;
+
+MeshParam Spidermesh::actualMeshSpeed;
+MeshParam Spidermesh::requiredMeshSpeed;
+
+hw_timer_t* Spidermesh::watchdogPortia;
+bool Spidermesh::interruptResetPortiaFlag=false;
+
+
+void Spidermesh::begin(int hop, int duty, int rf_speed)
+{
+
+    if(hop>=5 && hop<31) requiredMeshSpeed.hop = hop;
+    if(duty==5 || duty==10 || duty==20 || duty==40 || duty==80 || duty==160) requiredMeshSpeed.duty = duty;
+    if(rf_speed==20) requiredMeshSpeed.rf_speed = PRESET_20B;
+    if(rf_speed==72) requiredMeshSpeed.rf_speed = PRESET_72B;
+
+
+    
+
+	xTaskCreatePinnedToCore(
+	//xTaskCreate(
+		Spidermesh::smkGatewayTaskCore,
+		"smkGatewayTaskCore",
+		16384,	/* stack */
+		NULL,	/*  */
+		1,		/* priority */
+		&Task1, /*  */
+		0);		/* core # (0-1) arduino loop fn is on core 1 */ 
+}
+
+
+void Spidermesh::smkGatewayTaskCore(void *pvParameters)
+{
+	
+	mmux = portMUX_INITIALIZER_UNLOCKED;
+
+	//setlogBuffer(&logBuffer);
+	delay(1000);
+	if (!Smk900::init())
+		Serial.println("Error in typejson_document");
+
+	Smk900::setWhenEobIsReceived(ProcessState);
+
+
+    setMode(INIT_SMK900);
+    setState(INIT_GATEWAY_REGISTER);
+    setOtaTimeout(10000);
+
+
+	String mode = getPollingMode();
+	if (mode == "time" || mode == "fast")
+		setAutoPollingNodeMode(true);
+
+	while (true)
+	{
+		task();
+	}
+}
+
+void Spidermesh::task()
+{
+	Smk900::task();
+    ProcessState(false);
+
+  #ifdef WATCHDOG_SMK900_ENABLE
+    if(interruptResetPortiaFlag)
+    {
+        interruptResetPortiaFlag=false;
+        reset();
+        setMode(INIT_SMK900);
+        setState(INIT_GATEWAY_REGISTER);
+        setOtaTimeout(10000);        
+    }    
+	
+  #endif //WATCHDOG_SMK900_ENABLE	
+}
+
+
+
+bool Spidermesh::findNextNode(bool initSearch, bool otaActiveOnly)
+{
+	bool ret = false;
+	auto next = pCurrentNode;
+
+	//Smk900::findNext(false, initSearch);
+
+	int nbCheck = 0;
+	while (nbCheck < nodes.pool.size())
+	{
+		if (next == nodes.pool.end())
+			next = nodes.pool.begin();
+
+		if ((next->second.otaActive || !otaActiveOnly) && next->second.otaStep != STEP_DONE && next->second.otaStep != STEP_REJECTED )
+		{
+			pCurrentNode = next;
+			ret = true;
+			break;
+		}
+		nbCheck++;
+		next++;
+	}
+	return ret;
+}
+
+void Spidermesh::init()
+{
+	doProcessState = false;
+	setState(IDLE);
+}
+
+void Spidermesh::setState(ota_state new_state, ota_state following_step)
+{
+	current_state = new_state;
+	next_state = following_step;
+	eob_cnt = 0;
+	step_start_time = millis();
+};
+
+#ifdef WATCHDOG_SMK900_ENABLE
+void Spidermesh::interruptResetPortia()
+{
+    Serial.println("Portia not responding, reset and reinit register...");
+
+    interruptResetPortiaFlag=true;
+}
+
+void Spidermesh::initWatchdog(long millis)
+{
+    //setupWatchdog(&watchdogPortia, millis*1000, &interruptResetPortia);
+    watchdogPortia=timerBegin(1,80,true);
+    timerAlarmWrite(watchdogPortia, 20000000, false); // set time in uS must be fed within this time or reboot
+    timerAttachInterrupt(watchdogPortia, interruptResetPortia, true);
+    timerAlarmEnable(watchdogPortia);  // enable interrupt
+}
+#endif //WATCHDOG_SMK900_ENABLE
+
+
+void Spidermesh::launchUpdateOtaEngine()
+{
+	if (1)
+	{
+
+		setOtaTimeout(10000);
+		if (firmware.filename != "")
+		{
+			Serial.println("firmware: ");
+			Serial.println(firmware.filename);
+			setState(CHECK_FILE_AND_LOAD_IF_AVAILABLE);
+		}
+		else
+			return;
+
+		
+
+		auto i = nodes.pool.begin();
+		while (i != nodes.pool.end())
+		{
+			i->second.labelState.clear();
+			i->second.old_firmware.clear();
+			i->second.new_firmware.clear();
+			// i->second.otaActive = true;
+			i++;
+		}
+
+		setMode(UPDATE_NODES);
+		nodes.resetStep(true);
+		nodes.setLabels("START");
+		doProcessState = true;
+
+		PRTLN("==================================================");
+		PRTLN("          UPDATE START");
+		PRTLN("==================================================");
+
+
+		logJson("OTA START");
+
+#if SIM_SKIP_SOME_BROADCAST_UPLOAD
+		sim_skip_first_packet = true;
+#endif
+#if SIM_MISSING_PACKET_SCRATCH
+		firmware.test_skip_scratch = NB_RETRY_SAME_SCRATCH_LOST;
+#endif
+	}
+}
+
+void Spidermesh::abortOtaEngine()
+{
+	PRT("ABORT UPDATE ENGINE");
+	// hexPacket_t msg = apiPacket({0x0C, 0x00, 0xC6, 0x02});
+	hexPacket_t msg = apiPacket(0x06, {0x02}, false, true);
+	write(msg);
+
+	/*
+	//must validata that do not brick module (harware reset needed)
+	if(firmware.getType() == PYBOARD)
+	{
+		msg = apiPacket({0x0C, 0x00, 0x0E, 0xFF, 0xFF, 0xFF, 0x12});
+
+	}
+	*/
+
+	setState(ABORT_UPDATE);
+}
+
+String Spidermesh::translateOffStateToString()
+{
+	String string_state = "IDLE";
+	byte st = getState();
+	if (st >= CHECK_FILE_AND_LOAD_IF_AVAILABLE && st <= TEST_SERIAL_COMM)
+		string_state = "INIT";
+	else if (st >= READ_VERSION_NODES && st <= READ_PYBOARD_VERSION_NODES)
+		string_state = "READ VERSION";
+	else if (st >= PRIME_NODE_TO_UPDATE_INIT && st <= PRIME_NODE_TO_UPDATE)
+		string_state = "PRIME NODE";
+	else if (st >= BULKUPLOAD_INIT && st <= BULKUPLOAD)
+		string_state = "BULK UPLOAD";
+	else if (st >= GETMISSINGFLAGS_INIT && st <= GETMISSINGFLAGS)
+		string_state = "GETMISSING FLAGS";
+	else if (st >= PRUNE_VALID_PAGES_INIT && st <= PRUNE_VALID_PAGES)
+		string_state = "BROADCAST PERFORM CRC";
+	else if (st >= CHECK_IF_CRC_OK_INIT && st <= CHECK_IF_CRC_OK)
+		string_state = "CHECK IF CRC OK";
+	else if (st >= SEND_META_DATA_INIT && st <= SEND_META_DATA)
+		string_state = "SEND META DATA";
+	else if (st >= STOP)
+		string_state = "STOP";
+	return string_state;
+}
+
+String Spidermesh::getStateMachineStatus()
+{
+	DynamicJsonDocument jsonBuffer(10000);
+	String ret = "";
+	jsonBuffer.clear();
+
+	portENTER_CRITICAL(&mmux);
+	jsonBuffer["stateProcess"] = translateOffStateToString();
+	jsonBuffer["result"] = otaResult;
+
+	jsonBuffer["stateProgress"] = (firmware.current_progress <firmware.max_progress) ? firmware.current_progress * 100 / firmware.max_progress : 100;
+
+	JsonObject nodeList = jsonBuffer.createNestedObject("nodeList");
+	for (auto n : nodes.pool)
+	{
+		if (n.second.otaActive)
+		{
+
+			String m = SmkList::mac2String(n.first);
+			nodeList[m].createNestedObject("state");
+			nodeList[m]["state"] = n.second.otaStep;
+			nodeList[m]["detail"] = n.second.labelState;
+			nodeList[m]["old_version"] = n.second.old_firmware.getVersionString() + " - " + n.second.old_firmware_pyboard.getVersionString();
+			nodeList[m]["new_version"] = n.second.new_firmware.getVersionString() + " - " + n.second.new_firmware_pyboard.getVersionString();
+		}
+	}
+	portEXIT_CRITICAL(&mmux);
+
+	serializeJson(jsonBuffer, ret);
+	return ret;
+}
+
+String Spidermesh::getSmk900Firmware(bool start)
+{
+	String ret = "";
+
+	if (start)
+	{
+		PRTLN("LAUNCH GET SMK900");
+		auto i = nodes.pool.begin();
+		while (i != nodes.pool.end())
+		{
+			i->second.labelState.clear();
+			i->second.old_firmware.clear();
+			i->second.new_firmware.clear();
+			i->second.otaActive = true;
+			i++;
+		}
+		pCurrentNode = nodes.pool.begin();
+
+		setMode(READ_VERSION_SMK900);
+		setState(READ_VERSION_NODES);
+		nodes.resetStep(true);
+	}
+	DynamicJsonDocument jsonBuffer(10000);
+
+	jsonBuffer.clear();
+	JsonObject nodeList = jsonBuffer.createNestedObject("nodeList");
+
+	//portENTER_CRITICAL(&mmux);
+	jsonBuffer["stateProcess"] = translateOffStateToString();
+	for (auto n : nodes.pool)
+	{
+		if (n.second.otaActive)
+		{
+			String m = SmkList::mac2String(n.first);
+			nodeList[m].createNestedObject("state");
+			nodeList[m]["detail"] = n.second.labelState;
+			nodeList[m]["old_version"] = n.second.old_firmware.getVersionString();
+		}
+	}
+	//portEXIT_CRITICAL(&mmux);
+	serializeJson(jsonBuffer, ret);
+	return ret;
+}
+
+bool Spidermesh::isDynOptimalUpdateSpeed()
+{
+	bool ret = true;
+
+	uint8_t h = readFile("/hops").toInt();
+	if (h == 0)
+		h = 8;
+	uint8_t d = readFile("/duty").toInt();
+	if (d == 0)
+		d = 5;
+
+
+	//if specified by user with begin function
+	if(requiredMeshSpeed.hop != -1 && requiredMeshSpeed.duty != -1)
+	{
+		actualMeshSpeed.hop = requiredMeshSpeed.hop;
+		h = requiredMeshSpeed.hop;
+		actualMeshSpeed.duty =requiredMeshSpeed.duty;
+		d=requiredMeshSpeed.duty;
+		ret = false;
+	}			
+
+	if (actualMeshSpeed.bo != 1)
+		ret = false;
+	if (actualMeshSpeed.bi != 1)
+		ret = false;
+	if (actualMeshSpeed.hop != h)
+		ret = false;
+	if (actualMeshSpeed.rd != 1)
+		ret = false;
+	if (actualMeshSpeed.rde != 0)
+		ret = false;
+	if (actualMeshSpeed.duty != d)
+		ret = false;
+
+	return ret;
+};    
+
+void Spidermesh::logJson(String msg)
+{
+	#if LOG_JSON_ENABLED
+	log[getMinTimeFormated()] = msg;
+	#endif
+}
+
+
+
+//-----------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------------------------------
+bool Spidermesh::ProcessState(bool eob)
+{
+	bool ret = false;
+#if 0
+    PRT("MODE: ");
+    PRT(isMode());
+    PRT(" STATE: ");
+    PRTLN(isState());
+    delay(5);
+
+#endif
+	if (isState(IDLE))
+	{
+		// do nothing
+		ret = false;
+
+        bool have_send_packet = sendNextPacketBuffered();
+		if(isAutoPollingNodeEnabled() && !have_send_packet && isMode(READY))
+		{
+			if(eob)automaticNodePolling();
+			//delay(5);
+		}		
+	}
+
+	else if (isState(CHECK_FILE_AND_LOAD_IF_AVAILABLE))
+	{
+		PRTLN("\n--> CHECK_FILE_AND_LOAD_IF_AVAILABLE");
+		
+
+		if (1)
+		{
+			setMode(UPDATE_NODES);
+			setState(STOP);
+			setAutoPollingNodeMode(false);
+			otaResult = "start at " + getTimeFormated();
+
+			if (!firmware.open(firmware.filename))
+			{
+				PRTLN("Cannont open file");
+				setState(IDLE);
+				return false;
+			}
+			firmware.close();
+
+			if (!firmware.validationUf2Integrity())
+			{
+				PRTLN("UF2 file is corrupted");
+				return false;
+			}
+
+			firmware.calculOfEstimatedTime(getNumberOfNodeToUpdate());
+			setOtaTimeout(600000);
+
+			setState(INIT_GATEWAY_REGISTER);
+			logJson("UF2 OK");
+			requiredMeshSpeed.rf_speed = PRESET_72B;
+			requiredMeshSpeed.duty = 5;
+
+/*
+			if (firmware.getType() == SMK900)
+				setState(INIT_GATEWAY_REGISTER);
+			else if (firmware.getType() == PYBOARD)
+				setState(SLOW_DYN_FOR_SIM_BUTTON);
+			else if (firmware.getType() == EVM)
+				setState(INIT_GATEWAY_REGISTER);
+			setOtaTimeout(10000);
+*/
+
+			dumpReceivedBuffer();
+		}
+	}
+	else if (isState(INIT_GATEWAY_REGISTER))
+	{
+#if SHOW_SMK900_INIT
+		Serial.println("--> Init Smk900 Register");
+#endif
+		setState(INIT_GATEWAY_REGISTER_WAIT_DONE);
+		log[String(millis())] = "INIT portia";
+
+		// set gateway mac as unavailable
+		gatewayMacAddressIsReceived = false;
+
+		// void (*cc)(const mesh_t::iterator pNode, bool success);
+		// https://www.learncpp.com/cpp-tutorial/lambda-captures/
+
+		setOtaTimeout(50000);
+		hexPacket_t cmd1 = apiPacket(SMK_WRITE_REG, {0x00, 17, 0x01, 0x01}, LOCAL);
+
+		//mesh_t gateway_boot;
+		SmkNode g;
+		gateway_boot.insert(std::make_pair(0,g));
+
+		WriteAndExpectAnwser(gateway_boot.begin(), cmd1, 0x14, 6, "init", ExpectCallback([](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+																			{
+            if(!success) { Serial.println(" Error: Unable to set EOB flag"); return; }
+
+#if SHOW_SMK900_INIT
+            Serial.println(pNode->second.name + " EOB flag enabled");
+#endif
+
+            //uint8_t uart_setting[10] = {0x0E, 0,0,0,0,0,100,0};
+            //hexPacket_t cmd2 = localSetRegister(34,8,uart_setting); //Enable sleep for the gateway in order to fix esd bug...
+			hexPacket_t cmd2 = apiPacket(SMK_WRITE_REG, {0x00, 34, 0x08, 0x0E, 0,0,0,0,0,100,0}, LOCAL);
+			
+
+            WriteAndExpectAnwser(gateway_boot.begin(), cmd2,0x14,  "init", ExpectCallback([](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) ->void {
+                if(!success) { return; }
+#if SHOW_SMK900_INIT
+                Serial.println(pNode->second.name + " reg 34 writen");
+#endif
+				//log[String(millis())] = "EOB written";
+            
+                //hexPacket_t cmd3 = localTransfertConfigFromRAMBUFF(1); //transfert it to RAM to enable config sent
+				//    uint8_t cmd[5] = {0xFB, 2, 0, 0x0B, location};
+				hexPacket_t cmd3 = apiPacket(SMK_TRANSFERT_MEM, {0x01}, LOCAL);
+                WriteAndExpectAnwser(gateway_boot.begin(), cmd3, 0x1B,  "init", ExpectCallback([](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) ->void {
+                    if(!success) { Serial.println(" Node " + pNode->second.name + " is unavailable."); return; }
+#if SHOW_SMK900_INIT
+                        Serial.println(pNode->second.name + " transfert to RAM");
+#endif
+
+                        //hexPacket_t cmd5 = requestMacAddress();
+						//uint8_t cmd[20] = {0xFB, 4, 0, 3, 2,0,8};
+						hexPacket_t cmd5 = apiPacket(SMK_READ_REG, {0x00, 0x00, 0x08}, LOCAL);
+                        
+                        WriteAndExpectAnwser(gateway_boot.begin(), cmd5, 0x13,  "init", ExpectCallback([](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) ->void {
+                            if(!success) { Serial.println(" Node " +   pNode->second.name + " is unavailable."); return; }
+                            
+                            SaveGatewayMacAddress(packet);
+							IPAddress RepliedMacAddress = {packet[10], packet[9], packet[8], packet[7]}; 
+							String smac =RepliedMacAddress.toString();
+							uint32_t a = SmkList::macString2Umac(smac);
+
+							if(!initDone)
+							{
+								nodes.pool.clear(); 
+								nodes.add(a, "gateway", LOCAL, "main", "main gateway");
+								gateway=nodes.pool.begin();
+
+								PRT("GATEWAY mac is: ");
+								PRTLN(smac);
+
+								loadList();
+							}
+							Smk900::findNext(true,true);
+							//auto g = gateway;
+                            initDone = true;
+							setState(GET_SPEED_DYN);
+							
+							
+                        }));
+                }));
+            })); 
+		}));
+		
+	}
+	else if(isState(INIT_GATEWAY_REGISTER_WAIT_DONE))
+	{
+		if(initDone)
+		{ 
+			Serial.print("init done");
+			setState(GET_SPEED_DYN);		
+			ret=true;
+		}
+	}
+	else if (isState(GET_SPEED_DYN))
+	{
+		if (!eob
+		) // leave a delay otherwise bug
+			return false;
+
+		PRTLN("\n--> GET_SPEED_DYN");
+		log[String(millis())] = "GET_SPEED_DYN";
+		setOtaTimeout(50000);
+
+		// hexPacket_t cmd = apiPacket({0x03, 0x01, 0x02, 0x06}); // ret reg 2 DYN
+		hexPacket_t cmd = apiPacket(SMK_READ_REG, {0x00, 2, 6}, LOCAL);
+
+		WriteAndExpectAnwser(gateway, cmd, 0x13,  "getdyn", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+																		{
+            //TIMEOUT
+            if(!success) {
+                PRTLN("  Unable to get speed dyn"); return; 
+            }
+        
+            //SUCESS
+            PRTF("  dyn bo:%d", packet[7]);
+            PRTF("  bi:%d", packet[8]);
+            PRTF("  hop:%d", packet[9]);
+            PRTF("  red:%d", packet[10]);
+            PRTF("  ren:%d", packet[11]);
+            PRTF("  duty:%d\n", packet[12]);
+
+            actualMeshSpeed.bo = packet[7];
+            actualMeshSpeed.bi = packet[8];
+            actualMeshSpeed.hop = packet[9];
+            actualMeshSpeed.rd = packet[10];
+            actualMeshSpeed.rde = packet[11];
+            actualMeshSpeed.duty = packet[12];
+            resetOtaTimeout();
+
+			if(!isDynOptimalUpdateSpeed())
+            	setState(SET_SPEED_DUTY);
+			else
+				setState(GET_SPEED_RF);
+
+            doProcessState = true; }));
+
+		ret = true;
+	}
+	else if (isState(SET_SPEED_DUTY))
+	{
+		if (!eob || (eob_cnt < 2))
+			return false;
+		if (doProcessState)
+		{
+			PRTLN("\n--> SET_SPEED_DYN");
+			log[String(millis())] = "SET_SPEED_DYN";
+			//pCurrentNode->second.otaStep = STEP_WAIT;
+			setOtaTimeout(50000);
+
+			uint8_t h = readFile("/hops").toInt();
+			if (h == 0)
+				h = 8;
+			uint8_t d = readFile("/duty").toInt();
+			if (d == 0)
+				d = 5;
+
+
+			//if specified by user with begin function
+			if(requiredMeshSpeed.hop != -1 && requiredMeshSpeed.duty != -1 && isMode(INIT_SMK900))
+			{
+				actualMeshSpeed.hop = requiredMeshSpeed.hop;
+				h = requiredMeshSpeed.hop;
+				actualMeshSpeed.duty =requiredMeshSpeed.duty;
+				d=requiredMeshSpeed.duty;
+			}
+
+
+
+			hexPacket_t cmd = apiPacket(0x0A, {actualMeshSpeed.bo, actualMeshSpeed.bi, h, actualMeshSpeed.rd, actualMeshSpeed.rde, d}, LOCAL); // ret reg 2 DYN
+
+			WriteAndExpectAnwser(gateway, cmd, 0x1A, "setspeed",ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+																			{
+                //TIMEOUT
+                if(!success) {
+                    pNode->second.otaStep = STEP_FAILED;
+                     PRTLN("  Unable to set speed dyn"); return; 
+                }
+				log[String(millis())] = "--OK";
+            
+                //SUCESS
+                setState(GET_SPEED_RF);
+				
+                resetOtaTimeout();
+                doProcessState = true; }));
+			doProcessState = false;
+			delay(50);
+			ret = true;
+		}
+	}
+	else if (isState(GET_SPEED_RF))
+	{
+		if (eob_cnt > 2 && eob)
+		{
+			log[String(millis())] = "--OK";
+			//__________________________________________
+			PRTLN("\n--> GET_SPEED_RF");
+			// hexPacket_t cmd = apiPacket({0x03, 1, 11, 1}); // reg preset from ram
+
+
+			hexPacket_t cmd = apiPacket(SMK_READ_REG, {1, 11, 1}, LOCAL); // reg preset from ram
+
+			WriteAndExpectAnwser(gateway, cmd, 0x13, "getpreset", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+																			{
+                //TIMEOUT
+                if(!success) {
+                    pNode->second.otaStep = STEP_FAILED;
+                     PRTLN("  Unable to get speed rf"); return; 
+                }
+
+                //SUCESS
+
+				#define EXPECTED_PRESET_RF_DURING_OTA_UPDATE 0x10
+				uint8_t presetRF = packet[7]&0x10;
+				uint8_t expectedPresetRF = EXPECTED_PRESET_RF_DURING_OTA_UPDATE;
+
+				log[String(millis())] = "GET_SPEED_RF";
+
+				if(isMode(INIT_SMK900) || (firmware.isPyboard() && isMode(UPDATE_NODES_END))) expectedPresetRF = EXPECTED_PRESET_RF_AT_BOOT;
+
+				else if(requiredMeshSpeed.rf_speed !=-1)
+				{
+					actualMeshSpeed.rf_speed = requiredMeshSpeed.rf_speed;
+					expectedPresetRF = requiredMeshSpeed.rf_speed;
+				}
+
+                if(presetRF==expectedPresetRF)
+                {
+                    setState(TEST_SERIAL_COMM);    
+                }
+                else
+                {
+                    //__________________________________________
+                    PRTLN("\n--> SET_SPEED_RF");
+                    //hexPacket_t cmd = apiPacket({0x04, 0, 11, 1,expectedPresetRF}); 
+					
+					hexPacket_t cmd = apiPacket(SMK_WRITE_REG, {0, 11, 1, expectedPresetRF}, LOCAL);
+                    WriteAndExpectAnwser(gateway, cmd, 0x14, "getpreset", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) ->void 
+                    {
+                        //TIMEOUT
+                        if(!success) {
+                            PRTLN("  Unable to get speed rf"); return; 
+                        }
+
+						log[String(millis())] = "SET_SPEED_RF";
+                        //__________________________________________
+                        PRTLN("\n--> SAVE TO EEPROM");
+                        //hexPacket_t cmd = apiPacket({0x0B, 2});
+						hexPacket_t cmd = apiPacket(SMK_TRANSFERT_MEM, {2}, LOCAL);
+                        WriteAndExpectAnwser(gateway, cmd, 0x1B, "getpreset", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) ->void 
+                        {
+                            //TIMEOUT
+                            if(!success) {
+                                
+                                PRTLN("  Unable to save to EEPROM"); return; 
+                            }
+
+                            reset();
+                            setState(TEST_SERIAL_COMM);
+                            PRTLN("  SAVE to EEPROM sucess");
+							log[String(millis())] = "SAVE to EEPROM";
+                            setOtaTimeout(300000);
+                            doProcessState = true;
+                        }));
+                        resetOtaTimeout();
+                    }));
+                } }));
+			ret = true;
+			doProcessState = false;
+		}
+	}
+	else if (isState(TEST_SERIAL_COMM))
+	{
+		if (!eob)
+			return false;
+
+		//__________________________________________
+		PRTLN("\n--> TEST SERIAL COMM");
+		// hexPacket_t cmd = apiPacket({0x03, 2, 11, 1});
+		hexPacket_t cmd = apiPacket(SMK_READ_REG, {2, 11, 1}, LOCAL);
+		WriteAndExpectAnwser(gateway, cmd, 0x13, 1, "testserial", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+																		   {
+            //TIMEOUT
+            if(!success) {
+                
+                PRTLN("  Unable reach gateway via serial"); return; 
+            }
+            setState(PRIME_NODE_TO_UPDATE_INIT);
+            PRTLN("  Test serial comm sucess");
+			
+			logJson("Test serial comm sucess");
+
+            if(isMode(UPDATE_NODES)) 
+            {
+                setOtaTimeout(300000);
+				setState(READ_VERSION_NODES);
+            }
+			else if(firmware.isPyboard() && isMode(UPDATE_NODES_END))
+			{
+				setState(PYBOARD_CHECK_PROGRESS_INIT);
+			}
+			
+            else if(isMode(INIT_SMK900))
+            {
+                setMode(READY);
+                setState(IDLE);
+            }
+            resetOtaTimeout(); }));
+		ret = true;
+	}
+	//------------------------------------------------------------------------------------------------------------------------------
+	else if (isState(READ_VERSION_NODES))
+	{
+		// setup
+		if (eob && eob_cnt == 1)
+		{
+			PRTLN("\n--> READ_VERSION_NODES_INIT");
+			logJson("READ_VERSION_NODES_INIT");
+			nodes.resetStep();
+			ClearFifoAndExpectList();
+			pCurrentNode = nodes.pool.begin();
+			setOtaTimeout(900000);
+			findNextNode(true, !isMode(READ_VERSION_SMK900));
+		}
+		// loop
+		else if (eob && eob_cnt > 3)
+		{
+			if (currentNodeCanBePolled())
+			{
+				PRTLN("\n--> READ_VERSION_NODES");
+				pCurrentNode->second.otaStep = STEP_WAIT;
+
+				// hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x83}, pCurrentNode, {0x02, 0x15, 0x01}); // READ VERSION REGISTER
+				hexPacket_t cmd = apiPacket(SMK_READ_REG, {0x02, 0x15, 1}, pCurrentNode->second.local);
+
+				WriteAndExpectAnwser(pCurrentNode, cmd, SMK_READ_REG, "readV1", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+																			 {
+                    if(!success) {  //TIMEOUT
+                        PRTF("  Node %06X unable to read version.\n", pNode->first); 
+                        if(isMode(READ_VERSION_SMK900))
+                        {
+                            pNode->second.otaStep = STEP_REJECTED;
+                            pNode->second.labelState = "Timeout";
+							logJson("Timeout");
+                            
+                            PRTF("  Node %06X rejected.\n", pNode->first);
+                            findNextNode(false,!isMode(READ_VERSION_SMK900));
+                            if(nodes.isStepComplete()) 
+                            {
+                                setState(STOP);
+                            }
+                        }
+                        else
+                        {
+                            findNextNode(false,!isMode(READ_VERSION_SMK900));
+                            pNode->second.otaStep = STEP_RETRY;
+                        }
+
+                        return; 
+                    }
+                    resetOtaTimeout();
+					logJson("success");
+                    
+                    if(isMode(UPDATE_NODES) || isMode(READ_VERSION_SMK900))    //SUCESS
+					{
+						PRTLN("  read to old version");
+                        pNode->second.old_firmware.version = packet[13];
+					}
+                    else if(isMode(UPDATE_NODES_END))                                    
+					{
+						PRTLN("  read to new version");
+                        pNode->second.new_firmware.version = packet[13];
+					}
+
+                    firmware.current_progress++;
+
+                    //hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x83},pCurrentNode,{0x02, 0x18, 0x02}); // READ SUB VERSION REGISTER
+					hexPacket_t cmd = apiPacket(SMK_READ_REG, {0x02, 0x18, 2},pCurrentNode->second.local);
+                    WriteAndExpectAnwser(pCurrentNode,cmd,SMK_READ_REG, "readV2", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) ->void 
+                    {
+                        if(!success) {  //TIMEOUT
+                            pNode->second.otaStep = STEP_FAILED;
+                            PRTF("  Node %06X unable read subversion.\n", pNode->first); 
+                            setState(STOP);
+                            return; 
+                        }
+                    
+                        //SUCESS
+                        u_bytes u;
+                        u.uint8b[0]=packet[13];
+                        u.uint8b[1]=packet[14];
+                        if(isMode(UPDATE_NODES) || isMode(READ_VERSION_SMK900))
+                            pNode->second.old_firmware.sub_version = u.uint16b[0];
+                        else if(isMode(UPDATE_NODES_END))                                    
+                            pNode->second.new_firmware.sub_version = u.uint16b[0];
+
+                        firmware.current_progress++;
+
+
+                        //hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x83},pCurrentNode,{0x02, 0x19, 0x02}); // READ SUB VERSION REGISTER
+						hexPacket_t cmd = apiPacket(SMK_READ_REG, {0x02, 0x19, 2},pCurrentNode->second.local);
+                        WriteAndExpectAnwser(pCurrentNode,cmd,SMK_READ_REG, "readV3", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) ->void 
+                        {
+                            //TIMEOUT
+                            if(!success) {
+                                pNode->second.otaStep = STEP_FAILED;
+                                PRTF("  Node %06X unable read database version.\n", pNode->first); 
+                                setState(STOP);
+                                return; 
+                            }
+                        
+                            //SUCESS
+                            u_bytes u;
+                            u.uint8b[0]=packet[13];
+                            u.uint8b[1]=packet[14];
+                            if(isMode(UPDATE_NODES) || isMode(READ_VERSION_SMK900))
+                                pNode->second.old_firmware.database = u.uint16b[0];
+                            else if(isMode(UPDATE_NODES_END))                                    
+                                pNode->second.new_firmware.database = u.uint16b[0];
+
+                            firmware.current_progress++;
+
+
+                            //hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x83},pCurrentNode,{0x02, 0x1A, 0x01}); // READ SUB VERSION REGISTER
+							hexPacket_t cmd = apiPacket(SMK_READ_REG, {0x02, 0x1A, 1},pCurrentNode->second.local);
+                            WriteAndExpectAnwser(pCurrentNode,cmd,SMK_READ_REG, "readV4", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) ->void 
+                            {
+                                if(!success) { //TIMEOUT
+                                    pNode->second.otaStep = STEP_FAILED;
+                                    PRTF("  Node %06X unable read serie.\n", pNode->first); 
+                                    setState(STOP);
+                                    return; 
+                                }
+                            
+                                //SUCESS
+                                if(isMode(UPDATE_NODES) || isMode(READ_VERSION_SMK900))
+                                    pNode->second.old_firmware.serie = packet[13];
+                                else if(isMode(UPDATE_NODES_END))                                    
+                                    pNode->second.new_firmware.serie = packet[13];
+                                pNode->second.otaStep = STEP_DONE;
+                                firmware.current_progress++;
+
+                                
+                                
+                                if(nodes.isStepComplete()) 
+                                {
+                                    if(isMode(UPDATE_NODES) && (firmware.isSmk900() || firmware.isPyboard()))
+                                    {
+                                        setState(PRIME_NODE_TO_UPDATE_INIT);
+                                    }
+                                    else if(isMode(UPDATE_NODES) && firmware.isVmMachine())
+                                    {
+                                        setState(EVM_OTA_START);
+                                    }
+                                    else if(isMode(UPDATE_NODES_END))
+                                    {
+                                        setState(STOP);
+                                    }
+                                    else
+                                    {
+                                        PRTLN("**reading node complete**");
+										logJson("success");
+                                        setState(IDLE);
+                                        setMode(READY);
+                                    }
+                                }
+                                findNextNode(false,!isMode(READ_VERSION_SMK900));
+
+                                resetOtaTimeout();
+                                PRTF("  Node %06X have version ", pNode->first);
+								char b[30];
+								sprintf(b,"version %06X", pNode->first);
+								logJson(b);
+                                PRTLN(pNode->second.old_firmware.getVersionString());
+                            }));
+                        }));
+                    })); 
+				}));
+				ret = true;
+			}
+		}
+	}
+	else if (isState(READ_PYBOARD_VERSION_NODES_INIT))
+	{
+		if (eob)
+		{
+			PRTLN("\n--> READ_PYBOARD_VERSION_NODES_INIT");
+			logJson("READ_PYBOARD_VERSION");
+			nodes.resetStep();
+			pCurrentNode = nodes.pool.begin();
+			findNextNode(true, !isMode(READ_VERSION_PYBOARD));
+			setOtaTimeout(600000);
+			setState(READ_PYBOARD_VERSION_NODES);
+			eob_cnt = 0;
+		}
+	}
+	else if (isState(READ_PYBOARD_VERSION_NODES))
+	{
+		if (eob && (eob_cnt == 3))
+		{
+			dumpReceivedBuffer(); // since polling will contain already a VM expect from automatic polling
+		}
+		else if (eob && (eob_cnt > 3))
+		{
+			if (currentNodeCanBePolled())
+			{
+				PRTLN("\n--> READ_PYBOARD_VERSION_NODES");
+				pCurrentNode->second.otaStep = STEP_WAIT;
+
+				// hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x8E}, pCurrentNode, {0x38}); // READ SUB VERSION REGISTER
+				hexPacket_t cmd = apiPacket(SMK_VM_EXEC, {0x38}, pCurrentNode->second.local);
+				WriteAndExpectAnwser(pCurrentNode, cmd, 0x9E, "readpyV", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+																			 {
+                    //TIMEOUT
+                    if(!success) {
+                        
+                        PRTF("  Node %06X unable read pyboard version.\n", pNode->first); 
+                        if(isMode(READ_VERSION_PYBOARD))
+                        {
+                            pNode->second.otaStep = STEP_REJECTED;
+                            pNode->second.labelState = "TIMEOUT";
+                            if(nodes.isStepComplete()) 
+                            {
+                                setState(STOP);
+                            }
+							else findNextNode(false,!isMode(READ_VERSION_PYBOARD));
+							resetOtaTimeout();
+                        }
+                        else
+                        {
+                            if(pNode->second.nbFailed++ >2)
+                            {
+                                pNode->second.otaStep = STEP_FAILED;
+                                setState(STOP);
+                            }
+                            else
+                            {
+								resetOtaTimeout();
+                                pNode->second.otaStep = STEP_RETRY;
+                            }                            
+                        }
+                        return; 
+                    }
+                
+                    //SUCESS
+					bool doFindNext = true;
+                    if(packet.size() == 15)
+                    {
+                        //to fix small bug in evm, tiny of pyboard, suspected on tiny
+                        int start_version_pos=11;
+                        if( packet[1] == 0x0D) start_version_pos=12;
+
+                        
+                        if(isMode(UPDATE_NODES) || isMode(READ_VERSION_PYBOARD))
+                        {
+                            pNode->second.old_firmware_pyboard.version = extractU16(packet, start_version_pos);
+                            pNode->second.old_firmware_pyboard.sub_version = extractU16(packet, start_version_pos+2);
+                        }
+                        else if(isMode(UPDATE_NODES_END))                                    
+                        {
+                            pNode->second.new_firmware_pyboard.version = extractU16(packet, start_version_pos);
+                            pNode->second.new_firmware_pyboard.sub_version = extractU16(packet, start_version_pos+2);
+                        }
+
+                        pNode->second.otaStep = STEP_DONE;
+                        firmware.current_progress++;
+						pNode->second.labelState = "OK";
+                        PRTF("  Node %06X pyboard version ", pNode->first);
+						
+                        PRTLN(pNode->second.old_firmware.getVersionString());
+                    }
+					else if(pNode->second.nbFailed++ <3)
+                    {
+						
+						PRT("  READ_PYBOARD_VERSION_NODES ");
+						PRTF("%06X", pNode->first);
+						PRTLN(" STEP_RETRY");
+                        pNode->second.otaStep = STEP_RETRY;
+						pNode->second.labelState = "STEP_RETRY";
+						doFindNext = false;
+					}
+                    else
+                    {
+						
+						PRT("  READ_PYBOARD_VERSION_NODES ");
+						PRTF("%06X", pNode->first);
+						PRTLN(" STEP_REJECTED");
+                        pNode->second.otaStep = STEP_REJECTED;
+						pNode->second.labelState = "REJECTED";
+
+                    }
+
+                    if(nodes.isStepComplete()) 
+                    {
+                        if(isMode(UPDATE_NODES))
+                        {
+							PRTLN("  READ_PYBOARD_VERSION_NODES  UPDATE_NODES");
+
+							if(firmware.isVmMachine())
+								setState(EVM_OTA_START);
+							else
+                            	setState(PRIME_NODE_TO_UPDATE_INIT);
+                        }
+                        else if(isMode(UPDATE_NODES_END))
+                        {
+							PRTLN("  READ_PYBOARD_VERSION_NODES  UPDATE_NODES_END");
+                            setState(STOP);
+                        }
+                        else
+                        {
+							PRTLN("  READ_PYBOARD_VERSION_NODES  else");
+                            setState(IDLE);
+                            setMode(READY);
+                        }
+                    }
+
+                    if(doFindNext) findNextNode(false,!isMode(READ_VERSION_PYBOARD));
+
+
+                    resetOtaTimeout(); }));
+				ret = true;
+			}
+		}
+	}
+
+	// for EVM only --------------------------------------------------
+	else if (isState(EVM_OTA_START))
+	{
+		if (eob && (eob_cnt == 1))
+		{
+			PRTLN("\n--> EVM_OTA_START_INIT");
+			nodes.resetStep();
+			pCurrentNode = nodes.pool.begin();
+			findNextNode(true, true);
+
+			setOtaTimeout(60000);
+			dumpReceivedBuffer();
+		}
+		else if (eob && (eob_cnt > 2))
+		{
+			if (currentNodeCanBePolled())
+			{
+				PRTLN("\n--> EVM_OTA_START");
+				pCurrentNode->second.otaStep = STEP_WAIT;
+
+				// hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x86}, pCurrentNode, {0x00, firmware.nbBlock.uint8b[0], firmware.nbBlock.uint8b[1]});
+
+				byte ota_subcommand = 0x00;
+				if (firmware.getType() == EVM)
+					ota_subcommand |= 0x80;
+
+				hexPacket_t cmd = apiPacket(SMK_VM_FLASH, {0x00}, pCurrentNode->second.local); // start evm flash, will stop an active EVM as well if there is any
+
+				PRTF("  MAC to evm start %06X\n", pCurrentNode->second.mac.address);
+
+				WriteAndExpectAnwser(pCurrentNode, cmd, PACKET_VM_FLASH_RESP, "evmstart", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+																						{
+                    //TIMEOUT
+                    if(!success) {
+                        pNode->second.otaStep = STEP_FAILED;
+                        PRTF("  Node %06X unable to start evm.\n", pNode->first); 
+                        setState(STOP);
+                        return; 
+                    }
+                
+                    //SUCESS
+                    pNode->second.otaStep = STEP_DONE;
+                    pNode->second.labelState = "NODE EVM STARTED";
+                    firmware.current_progress++;
+                    
+                    if(nodes.isStepComplete()) 
+                    {
+                        setState(PRIME_NODE_TO_UPDATE_INIT);
+                    }
+                    resetOtaTimeout();
+                    PRTF("  Node %06X have been EVM started.\n", pNode->first); 
+				}));
+
+				ret = true;
+				findNextNode(true,true);
+			}
+		}
+	}
+	//---------------------------------------------------------------------------------------------
+	else if (isState(PRIME_NODE_TO_UPDATE_INIT))
+	{
+		PRTLN("\n--> PRIME_NODE_TO_UPDATE_INIT");
+		nodes.resetStep();
+		pCurrentNode = nodes.pool.begin();
+		findNextNode(true, true);
+
+		setOtaTimeout(60000);
+		dumpReceivedBuffer();
+		setState(PRIME_NODE_TO_UPDATE);
+	}
+	else if (isState(PRIME_NODE_TO_UPDATE))
+	{
+		if (eob)
+		{
+			if (currentNodeCanBePolled())
+			{
+				PRTLN("\n--> PRIME_NODE_TO_UPDATE");
+				logJson("PRIME_NODE_TO_UPDATE " + macIntToString(pCurrentNode->second.mac.address));
+				pCurrentNode->second.otaStep = STEP_WAIT;
+
+				// hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x86}, pCurrentNode, {0x00, firmware.nbBlock.uint8b[0], firmware.nbBlock.uint8b[1]});
+
+				byte ota_subcommand = 0x00;
+				if (firmware.getType() == EVM)
+					ota_subcommand |= 0x80;
+
+				hexPacket_t cmd = apiPacket(SMK_UPDATE_OTA_CMD, {ota_subcommand, firmware.nbBlock.uint8b[0], firmware.nbBlock.uint8b[1]}, pCurrentNode->second.local);
+
+				PRTF("  MAC to prime %06X\n", pCurrentNode->second.mac.address);
+
+				WriteAndExpectAnwser(pCurrentNode, cmd, SMK_UPDATE_OTA_CMD, "primenode", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+																						{
+                    //TIMEOUT
+                    if(!success) {
+                        pNode->second.otaStep = STEP_FAILED;
+                        PRTF("  Node %06X unable to prime it.\n", pNode->first); 
+                        setState(STOP);
+                        return; 
+                    }
+                
+                    //SUCESS
+                    pNode->second.otaStep = STEP_DONE;
+                    pNode->second.labelState = "NODE PRIMED";
+                    firmware.current_progress++;
+                    
+                    if(nodes.isStepComplete()) 
+                    {
+                        setState(BULKUPLOAD_INIT);
+                    }
+                    resetOtaTimeout();
+                    PRTF2("  Node %06X in ota mode. State: %d\n", pNode->first, pNode->second.otaStep); }));
+				ret = true;
+				findNextNode(false, true);
+			}
+		}
+	}
+	else if (isState(BULKUPLOAD_INIT))
+	{
+		setOtaTimeout(60000);
+		firmware.resetOffset();
+		firmware.uf2 = SPIFFS.open(firmware.filename);
+		nodes.setLabels("UPLOAD");
+
+		setState(BULKUPLOAD);
+		PRTLN("\n--> BULKUPLOAD_INIT");
+		logJson("BULKUPLOAD_INIT ");
+	}
+	else if (isState(BULKUPLOAD))
+	{
+
+#if SKIP_BULKUPLOAD
+		setState(GETMISSINGFLAGS_INIT);
+		PRTLN("    BULKUPLOAD step is skipped");
+#else
+#if SIMULATION_BULKUPLOAD
+		firmware.readNextBlock(); // read block if needed (4 chunk per block)
+		int nb_to_send = firmware.checkNextChunk();
+		if (nb_to_send > 0)
+		{
+			float percent = firmware.current_block;
+			percent = percent / firmware.nbBlock.uint32b;
+			percent *= 100.0;
+			PRTF2("bulk: page:%3d  perc:%03.1f: ", firmware.current_block, percent);
+
+			for (int i = 0; i < SIZE_DATA_PER_PACKET; i++)
+			{
+				// write(firmware.getChunkByte());
+				PRTF("%02X", firmware.getChunkByte());
+			}
+			PRTLN("");
+			resetOtaTimeout();
+		}
+		if (firmware.isEndCondition())
+			setState(GETMISSINGFLAGS_INIT);
+		firmware.current_progress++;
+#else
+		if (eob)
+		{
+			firmware.readNextBlock(); // read block if needed (4 chunk per block)
+			int nb_to_send = firmware.checkNextChunk();
+
+			if (nb_to_send > 0)
+			{
+				u_bytes sPage;
+				sPage.uint32b = firmware.start_page;
+
+				byte ota_subcommand = 0x01;
+				if (firmware.getType() == EVM)
+					ota_subcommand |= 0x80;
+
+				hexPacket_t pkt = {ota_subcommand, sPage.uint8b[0], sPage.uint8b[1]};
+				for (int i = 0; i < SIZE_DATA_PER_PACKET; i++)
+				{
+					// write(firmware.getChunkByte());
+					pkt.push_back(firmware.getChunkByte());
+				}
+				float percent = firmware.current_block;
+				percent = percent / firmware.nbBlock.uint32b;
+				percent *= 100.0;
+				PRTF("bulk: perc: %4.1f: ", percent);
+				//PRTF("page: %3d - ", firmware.current_block);
+
+				hexPacket_t cmd = apiPacket(SMK_UPDATE_OTA_CMD, pkt, pCurrentNode->second.local, true);
+
+				firmware.start_page += NB_PAGE_PER_DATA_PACKET;
+				/*
+				for (int i = 0; i < SIZE_DATA_PER_PACKET; i++)
+				{
+					// write(firmware.getChunkByte());
+					x.push_back(firmware.getChunkByte());
+				}*/
+
+#if SIM_SKIP_SOME_BROADCAST_UPLOAD
+				if (sim_skip_first_packet++ > SIM_SKIP_SOME_BROADCAST_UPLOAD_EVERY)
+				{
+					sim_skip_first_packet = 0;
+					PRT("--------- packet skipped >");
+				}
+				else
+					write(cmd);
+#else
+				write(cmd);
+#endif
+
+				resetOtaTimeout();
+
+
+				firmware.current_progress++;
+				ret = true;
+			}
+			if (firmware.isEndCondition())
+			{
+				setState(GETMISSINGFLAGS_INIT);
+			}
+		}
+#endif
+#endif
+	}
+
+	else if (isState(GETMISSINGFLAGS_INIT))
+	{
+		PRTLN("\n--> GETMISSINGFLAGS_INIT");
+		nodes.resetStep();
+		pCurrentNode = nodes.pool.begin();
+
+		// find a node to update
+		findNextNode(true,true);
+
+		setState(GETMISSINGFLAGS);
+		current_sub_state = GETMISSINGFLAG_FIND_NEXT_PAGE;
+
+		setOtaTimeout(30000);
+	}
+	else if (isState(GETMISSINGFLAGS))
+	{
+		if (!eob)
+			return false;
+		if (currentNodeCanBePolled())
+		{
+			PRTLN("\n--> GETMISSINGFLAGS");
+			logJson("GETMISSINGFLAGS " + macIntToString(pCurrentNode->second.mac.address));
+			pCurrentNode->second.otaStep = STEP_WAIT;
+
+			// hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x86}, pCurrentNode, {0x07});
+
+			byte ota_subcommand = 0x07;
+			if (firmware.getType() == EVM)
+				ota_subcommand |= 0x80;
+			hexPacket_t cmd = apiPacket(SMK_UPDATE_OTA_CMD, {ota_subcommand}, pCurrentNode->second.local);
+
+			PRTF("  MAC to get missing flags: %06X\n", pCurrentNode->first);
+
+#if SIMULATION_GETMISSINGFLAGS
+			pCurrentNode->second.otaStep = STEP_DONE;
+
+			firmware.current_progress++;
+
+#if SIMULATION_MISSINGFLAGS_ERROR
+			static bool sim_done_once = false;
+			if (!sim_done_once)
+			{
+				PRTLN("  MISSING FOUND");
+				firmware.missing_list.push_back(missing_element_t(1, 0xFFFF));
+				setState(SEND_MISSING_PAGE_INIT);
+				sim_done_once = true;
+			}
+			else
+			{
+				PRTLN("  NO MISSING FOUND");
+				if (nodes.isStepComplete())
+					setState(PRUNE_VALID_PAGES_INIT);
+			}
+#endif
+
+#else
+
+			WriteAndExpectAnwser(pCurrentNode, cmd, SMK_UPDATE_OTA_CMD, "getmissflag",
+								 ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+												{
+                    //TIMEOUT
+                    if(!success) {
+                        pNode->second.otaStep = STEP_FAILED;
+                        PRTF("  Node %06X unable to get missing\n", pNode->first); 
+                        return; 
+                    }
+
+                    resetOtaTimeout();
+                    if(packet.size()>11) //if there is a page of missing flags
+                    {
+
+                        int nb_page = (packet.size()-11)/4;
+
+
+
+                        for(int i=0; i<nb_page; i++)
+                        {
+                            int32_t page = extractU16(packet,i*4+11);
+                            uint32_t flag = extractU16(packet,i*4+13);
+#if SIM_MISSING_PACKET_SCRATCH
+							if(page==0 && firmware.test_skip_scratch >0)
+							{
+								firmware.test_skip_scratch--;
+								flag |= SIM_MISSING_PACKET_SCRATCH_BIT;
+							}
+#endif
+
+                            firmware.missing_list.push_back(missing_element_t (page, flag));
+                            PRTF2("  scratchByteId:%d - flag:%04X\n", page, flag);
+                        }
+                        PRTF("  ERROR - NB MISSING PAGE:%d\n", nb_page);
+
+
+                        //bug for those version so drop the node
+                        if(pNode->second.old_firmware.version == 2 && pNode->second.old_firmware.sub_version < 19)
+                        {
+#if SKIP_NODE_WHEN_MISSING_PAGE_OLD_VERSION
+                            pNode->second.otaStep = STEP_REJECTED; 
+                            findNextNode(false,true);
+#else
+                            setState(SEND_MISSING_PAGE_INIT);
+#endif
+                        }
+                        else
+                        {
+                            setState(SEND_MISSING_PAGE_INIT);
+                        }
+                        return;
+                    }
+                    else //no missing flag
+                    {
+                        pNode->second.otaStep = STEP_DONE;
+                        firmware.current_progress++;
+                        findNextNode(false, true);
+                    }
+                    
+                
+                    //SUCESS
+                    if(nodes.isStepComplete()) 
+                    {
+                        setState(PRUNE_VALID_PAGES_INIT);
+                    }
+                    resetOtaTimeout();
+                    PRTF(" Node %06X have no missing flag\n", pNode->first); }));
+
+#endif
+			ret = true;
+		}
+	}
+	else if (isState(SEND_MISSING_PAGE_INIT))
+	{
+		if (eob)
+		{
+			
+			
+			if (firmware.missing_list.size() > 0)
+			{
+				PRTLN("\n__________________________\n--> SEND_MISSING_PAGE_INIT");
+				setState(SEND_MISSING_PAGE);
+				firmware.current_block = -1;
+				wait_eob_count = 0;
+				firmware.it_missing_list = firmware.missing_list.begin();
+			}
+			else
+			{
+				if (wait_eob_count++ > 2)
+				{
+					setState(GETMISSINGFLAGS_INIT);
+				}
+			}
+			setOtaTimeout(180000);
+		}
+	}
+	else if (isState(SEND_MISSING_PAGE))
+	{
+
+		if (eob)
+		{
+			PRT("\n--> SEND_MISSING_PAGE\n");
+			logJson("SEND_MISSING_PAGE for " + macIntToString(pCurrentNode->second.mac.address));
+
+			hexPacket_t payload;
+
+			auto item = firmware.missing_list.begin();
+
+			hexPacket_t api_packet = {};
+			int nb_page_added = 0;
+			if (item != firmware.missing_list.end())
+			{
+				uint32_t mask = 0x01;
+				// u_bytes first_chunk_of_packet;
+				// first_chunk_of_packet.int32b = -1;
+				bool first_time = true;
+
+				for (int i = 0; i < NB_SIZE_SCRATCH_CHUNK; i++)
+				{
+					if (!(item->second & mask)) // if scratch is 0 meaning missing
+					{
+						item->second |= mask; // remove the scratch missing
+
+						// int32_t chunk = item->first*8 + i;
+						u_bytes x;
+						x.int32b = ((item->first) * 8) + i;
+						if (first_time)
+						{
+							first_time = false;
+							byte ota_subcommand = 0x01;
+							if (firmware.getType() == EVM)
+								ota_subcommand |= 0x80;
+
+							if (((pCurrentNode->second.old_firmware.version <= 2) && (pCurrentNode->second.old_firmware.sub_version < 19)) || FORCE_UNICAST_SENDING_MISSING_FLAG)
+							{
+								//ota_subcommand |= 0x40;
+								payload = {ota_subcommand, x.uint8b[0], x.uint8b[1]};
+								// 0xFB 0x19 0x00 0x0C 0x00 0x86 0x3E 0x40 0x00 0x01 0x00 0x00 0x01 0x02 0x03 0x04 0x05 0x06 0x07 0x08 0x09 0x0A 0x0B 0x0C 0x0D 0x0E 0x0F 0x10
+								// 0x0C 0x00 0x86 0x01 0x40 0x3E 0x00 0x01 0x00 0x00 0x01 0x02 0x03 0x04 0x05 0x06 0x07 0x08 0x09 0x0A 0x0B 0x0C 0x0D 0x0E 0x0F 0x10
+								// payload = {0x0C, 0x00, 0x86, pCurrentNode->second.mac.bOff[0], pCurrentNode->second.mac.bOff[1], pCurrentNode->second.mac.bOff[2], 0x01, x.uint8b[0], x.uint8b[1]};
+								// payload = {0x01, x.uint8b[0], x.uint8b[1]};
+							}
+							else
+							{
+								payload = {ota_subcommand, x.uint8b[0], x.uint8b[1]};
+								// payload = {0x0C, 0x00, 0xC6, 0x01, x.uint8b[0], x.uint8b[1]};
+								// payload = {0x01, x.uint8b[0], x.uint8b[1]};
+							}
+							resetOtaTimeout();
+						}
+						firmware.readBlockContainingChunk(x.int32b);
+						for (int j = 0; j < NB_SIZE_SCRATCH_CHUNK; j++)
+							payload.push_back(firmware.getChunkByte());
+
+						if (++nb_page_added >= NB_PAGE_PER_DATA_PACKET)
+							break;
+					}
+					mask <<= 1;
+				}
+
+				if (mask >= 0x00010000) // meaning no scratch left
+					firmware.missing_list.pop_front();
+				else
+				{
+					if (((pCurrentNode->second.old_firmware.version <= 2) && (pCurrentNode->second.old_firmware.sub_version < 19)) || FORCE_UNICAST_SENDING_MISSING_FLAG)
+					{
+						api_packet = apiPacket(SMK_UPDATE_OTA_CMD, payload, pCurrentNode->second.local);
+					}
+					else
+					{
+						api_packet = apiPacket(SMK_UPDATE_OTA_CMD, payload, pCurrentNode->second.local, BROADCAST_TO_PRIMED_NODE);
+					}
+					// api_packet = apiPacket(payload);
+				}
+			}
+
+			if (payload.size() > 0)
+			{
+				write(api_packet);
+			}
+
+			if (firmware.missing_list.size() <= 0)
+			{
+
+				setState(SEND_MISSING_PAGE_INIT);
+			}
+		}
+	}
+	else if (isState(PRUNE_VALID_PAGES_INIT))
+	{
+		setOtaTimeout(60000);
+		firmware.resetOffset();
+		PRTLN("\n--> PRUNE_VALID_PAGES_INIT");
+		logJson("PRUNE_VALID_PAGES_INIT");
+
+		setState(PRUNE_VALID_PAGES);
+		// dumpReceivedBuffer();
+	}
+	else if (isState(PRUNE_VALID_PAGES))
+	{
+
+#if SIMULATION_PRUNE_VALID_PAGES
+
+		std::vector<uint32_t> crc_result_vector = firmware.buildCrcPacket();
+		if (crc_result_vector.size() > 0)
+		{
+			PRT("out: 0xFB ");
+
+			int size_packet = 6 + crc_result_vector.size() * 4; // header + data size
+
+			PRTF("%02X", size_packet & 0xFF);
+			PRTF("%02X", (size_packet >> 8) & 0xFF);
+			PRT(" 0C00C6 09 ");
+
+			// page
+			PRTF("%02X", firmware.start_page & 0xFF);
+			PRTF("%02X ", (firmware.start_page >> 8) & 0xFF);
+
+			for (auto c : crc_result_vector)
+			{
+				u_bytes uc;
+				uc.uint32b = c;
+				PRTF("%02X", uc.uint8b[0]);
+				PRTF("%02X", uc.uint8b[1]);
+				PRTF("%02X", uc.uint8b[2]);
+				PRTF("%02X", uc.uint8b[3]);
+				PRT("  ");
+			}
+			PRTLN("");
+			resetOtaTimeout();
+		}
+		if (firmware.isEndCondition())
+		{
+			setState(CHECK_IF_CRC_OK_INIT);
+		}
+		firmware.current_progress++;
+#else
+		if (!eob)
+			return false;
+
+		PRTLN("\n--> PRUNE_VALID_PAGES");
+
+		std::vector<uint32_t> crc_result_vector = firmware.buildCrcPacket();
+		if (crc_result_vector.size() > 0)
+		{
+			u_bytes sPage;
+			sPage.uint32b = firmware.start_page;
+			// hexPacket_t pkt = {0x0C, 0x00, 0xC6, 0x09, sPage.uint8b[0], sPage.uint8b[1]};
+
+			byte ota_subcommand = 0x09;
+			//if (firmware.isVmMachine())
+			//	ota_subcommand |= 0x80;
+
+
+			hexPacket_t pkt = {ota_subcommand, sPage.uint8b[0], sPage.uint8b[1]};
+
+			for (auto c : crc_result_vector)
+			{
+				u_bytes cb;
+				cb.uint32b = c;
+				for (int i = 0; i < 4; i++)
+					pkt.push_back(cb.uint8b[i]);
+			}
+			// hexPacket_t apiPkt = apiPacket(pkt);
+			PRTF("  CRC page: %d  ", firmware.start_page);
+			write(apiPacket(SMK_UPDATE_OTA_CMD, pkt, pCurrentNode->second.local, BROADCAST_TO_PRIMED_NODE));
+			resetOtaTimeout();
+			firmware.current_progress++;
+			ret = true;
+		}
+		if (firmware.isEndCondition())
+		{
+			setState(CHECK_IF_CRC_OK_INIT);
+		}
+#endif
+	}
+	else if (isState(CHECK_IF_CRC_OK_INIT))
+	{
+		PRTLN("\n--> CHECK_IF_CRC_OK_INIT");
+		logJson("CHECK_IF_CRC_OK_INIT");
+		nodes.resetStep();
+		pCurrentNode = nodes.pool.begin();
+		findNextNode(true,true);
+
+		setOtaTimeout(60000);
+		setState(CHECK_IF_CRC_OK);
+	}
+	else if (isState(CHECK_IF_CRC_OK))
+	{
+		if (eob)
+		{
+			if (currentNodeCanBePolled())
+			{
+				PRTF("\n--> CHECK_IF_CRC_OK of node %06X\n", pCurrentNode->first);
+				pCurrentNode->second.otaStep = STEP_WAIT;
+
+				// hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x86}, pCurrentNode, {0x13});
+				byte ota_subcommand = 0x13;
+				if (firmware.getType() == EVM)
+					ota_subcommand |= 0x80;
+
+				hexPacket_t cmd = apiPacket(SMK_UPDATE_OTA_CMD, {ota_subcommand}, pCurrentNode->second.local);
+
+#if SIMULATION_CHECK_IF_CRC_OK
+				pCurrentNode->second.otaStep = STEP_DONE;
+				if (nodes.isStepComplete())
+					setState(SEND_META_DATA_INIT);
+				firmware.current_progress++;
+#else
+				WriteAndExpectAnwser(pCurrentNode, cmd, SMK_UPDATE_OTA_CMD, "checkcrc", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+																						{
+                        //TIMEOUT
+                        if(!success) {
+                            pNode->second.otaStep = STEP_FAILED;
+                            PRTF(" Node %06X unable to check CRC\n",pNode->first);
+							logJson("CHECK_IF_CRC timeout"  + macIntToString(pCurrentNode->second.mac.address));
+                            setState(STOP);
+                            return; 
+                        }
+
+                        //SUCESS
+						int size_crc = (pCurrentNode->second.local)?9:15;
+						if(packet.size()>size_crc)
+						{
+							PRTLN("ERROR CRC");
+						}
+                        pNode->second.otaStep = STEP_DONE;
+
+						logJson("CRC" + macIntToString(pCurrentNode->second.mac.address) + " " + hexPacketToAscii(packet));
+						
+                        if(nodes.isStepComplete()){
+							if(firmware.isVmMachine())
+								setState(RESET_NODE_ON_SEEK_INIT);
+							else
+								setState(SEND_META_DATA_INIT);
+						} 
+                        PRTF(" Node %06X have valid CRC\n", pNode->first);
+                        resetOtaTimeout();
+                        firmware.current_progress++; }));
+
+#endif
+				findNextNode(false, true);
+				ret = true;
+			}
+		}
+	}
+	else if (isState(SEND_META_DATA_INIT))
+	{
+		setOtaTimeout(30000);
+		PRTLN("\n--> SEND_META_DATA_INIT");
+		logJson("SEND_META_DATA");
+		nodes.resetStep();
+		pCurrentNode = nodes.pool.begin();
+
+		// find a node to update
+		findNextNode(true, true);
+
+		firmware.loadMetaDataBlock();
+		dumpReceivedBuffer();
+		setState(SEND_META_DATA);
+	}
+	else if (isState(SEND_META_DATA))
+	{
+		if (eob)
+		{
+			if (currentNodeCanBePolled())
+			{
+				PRTF("\n--> SEND_META_DATA to: %06X\n", pCurrentNode->first);
+				pCurrentNode->second.otaStep = STEP_WAIT;
+
+				u_bytes a;
+				a.uint32b = pCurrentNode->second.offset_chunk * (SIZE_DATA_PER_PACKET);
+
+				hexPacket_t payload = {0x0D, a.uint8b[0], a.uint8b[1]};
+				uint8_t *pBlock = &firmware.uf2Block[OFFSET_DATA + pCurrentNode->second.offset_chunk * (SIZE_DATA_PER_METADATA_PACKET)];
+				for (int i = 0; i < (SIZE_DATA_PER_METADATA_PACKET); i++)
+				{
+					payload.push_back(pBlock[i]);
+				}
+
+				// hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x86}, pCurrentNode, {0x0D, a.uint8b[0], a.uint8b[1]}, &firmware.uf2Block[OFFSET_DATA + pCurrentNode->second.offset_chunk * SIZE_DATA_PER_PACKET], SIZE_DATA_PER_PACKET);
+				hexPacket_t cmd = apiPacket(SMK_UPDATE_OTA_CMD, payload, pCurrentNode->second.local);
+
+#if SIMULATION_SEND_META_DATA
+				pCurrentNode->second.offset_chunk++;
+				if (pCurrentNode->second.offset_chunk == 2)
+					pCurrentNode->second.otaStep = STEP_DONE;
+				else
+					pCurrentNode->second.otaStep = STEP_INIT; // to retriger sending next chunck
+				if (nodes.isStepComplete())
+				{
+					if (firmware.getType() == PYBOARD)
+						setState(SEND_MAGICWORD_INIT);
+					else
+						setState(RESET_NODE_ON_SEEK_INIT);
+				}
+				firmware.current_progress++;
+#else
+				WriteAndExpectAnwser(pCurrentNode, cmd, SMK_UPDATE_OTA_CMD, "sendmeta", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+																						{
+                        //TIMEOUT
+                        if(!success) {
+                            pNode->second.otaStep = STEP_FAILED;
+                            PRTF(" Node %06X unable to send meta data\n", pNode->first); 
+                            pNode->second.labelState = "ERROR: META DATA";
+                            return; 
+                        }
+                    
+                        firmware.current_progress++;
+                        //SUCESS
+						resetOtaTimeout();
+                        pNode->second.offset_chunk++;
+                        if(pNode->second.offset_chunk == NB_WRITE_META_DATA)
+                        {
+							logJson("succes for " + macIntToString(pCurrentNode->second.mac.address));
+                            pNode->second.otaStep = STEP_DONE;
+                            //pNode->second.labelState = "META DATA RECEIVED";
+                        }
+                        else pNode->second.otaStep = STEP_INIT; //to retriger sending next chunck
+                        if(nodes.isStepComplete()) setState(RESET_NODE_ON_SEEK_INIT);
+                        PRTF(" Node %06X have received metadata\n", pNode->first); }));
+#endif
+				findNextNode(false,true);
+				ret = true;
+			}
+		}
+	}
+	else if (isState(RESET_NODE_ON_SEEK_INIT))
+	{
+		setOtaTimeout(60000);
+		PRTLN("\n--> RESET_NODE_ON_SEEK_INIT");
+		logJson("RESET_NODE_ON_SEEK");
+		nodes.resetStep();
+		pCurrentNode = nodes.pool.begin();
+
+		// find a node to update
+		findNextNode(true,true);
+
+		dumpReceivedBuffer();
+		setState(RESET_NODE_ON_SEEK);
+		doProcessState = true;
+	}
+	else if (isState(RESET_NODE_ON_SEEK))
+	{
+		if (!eob || !doProcessState)
+			return false;
+		if (currentNodeCanBePolled())
+		{
+			PRTF("\n--> RESET_NODE_ON_SEEK: %06X\n", pCurrentNode->first);
+			pCurrentNode->second.otaStep = STEP_WAIT;
+
+			// hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x84}, pCurrentNode, {0x00, 0x81, 0x04, 0xBB, 0xE2, 0x26, 0x38});
+			hexPacket_t cmd = apiPacket(SMK_WRITE_REG, {0x00, 0x81, 0x04, 0xBB, 0xE2, 0x26, 0x38}, pCurrentNode->second.local);
+
+#if SIMULATION_RESET_NODE_ON_SEEK
+			hexPacket_t cmd2 = apiPacket({0x0C, 0x00, 0x84}, pCurrentNode, {0x00, 0xA1, 0x04, 0x01, 0x00, 0x00, 0x00});
+			pCurrentNode->second.otaStep = STEP_DONE;
+			if (nodes.isStepComplete())
+				setState(SEND_MAGICWORD_INIT);
+			doProcessState = true;
+			firmware.current_progress++;
+			firmware.current_progress++;
+#else
+			pCurrentNode->second.otaStep = STEP_WAIT;
+			//--- Special register to unlock access to magic word register
+			WriteAndExpectAnwser(pCurrentNode, cmd, SMK_WRITE_REG, "resetseek1",
+								 ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+												{
+					// TIMEOUT
+					if (!success)
+					{
+						pNode->second.otaStep = STEP_FAILED;
+						PRTF(" Node %06X unable unlock reg 0xA1\n", pNode->first);
+						setState(STOP);
+						return;
+					}
+
+					//hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x84}, pCurrentNode, {0x00, 0xA1, 0x04, 0x01, 0x00, 0x00, 0x00});
+					hexPacket_t cmd = apiPacket(SMK_WRITE_REG, {0x00, 0xA1, 0x04, 0x01, 0x00, 0x00, 0x00}, pCurrentNode->second.local);
+					firmware.current_progress++;
+
+					//--- Special register to unlock access to magic word register
+					WriteAndExpectAnwser(pNode, cmd, SMK_WRITE_REG, "resetseek2", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+																							{
+							//TIMEOUT
+							if(!success) {
+								pNode->second.otaStep = STEP_FAILED;
+								PRTF(" Node %06X unable apply reset on seek\n", pNode->first); 
+								logJson("failed");
+								setState(STOP);
+								return; 
+							}
+						
+							//SUCESS
+							pNode->second.otaStep = STEP_DONE;
+							findNextNode(false,true);
+							doProcessState = true;
+							firmware.current_progress++;
+							logJson("RESET_NODE_ON_SEEK_INIT" + macIntToString(pCurrentNode->second.mac.address) + " " + hexPacketToAscii(packet));
+							
+							if(nodes.isStepComplete()) 
+							{
+
+							if(firmware.getType() == EVM)
+								setState(FORCE_EVM_TRIPPLET);
+							else
+								setState(SEND_MAGICWORD_INIT);
+							}
+							PRTF(" Node %06X have received reset on seek command\n", pNode->first); 
+						})); }));
+#endif
+			ret = true;
+#if SIMULATION_RESET_NODE_ON_SEEK
+			doProcessState = true;
+#else
+			doProcessState = false;
+#endif
+		}
+	}
+	else if (isState(SEND_MAGICWORD_INIT))
+	{
+		setOtaTimeout(60000);
+		PRTLN("\n--> SEND_MAGICWORD_INIT");
+		logJson("SEND_MAGICWORD");
+		nodes.resetStep();
+		pCurrentNode = nodes.pool.begin();
+
+		// find a node to update
+		findNextNode(true,true);
+
+		dumpReceivedBuffer();
+		setState(SEND_MAGICWORD);
+	}
+	else if (isState(SEND_MAGICWORD))
+	{
+		if (eob)
+		{
+			if (currentNodeCanBePolled())
+			{
+				PRT("\n--> SEND_MAGICWORD to :");
+				PRTLN(pCurrentNode->second.getMacAsString());
+				logJson("SEND_MAGICWORD " + macIntToString(pCurrentNode->second.mac.address));
+
+				pCurrentNode->second.otaStep = STEP_WAIT;
+
+#if SIMULATION_SEND_MAGICWORD
+				pCurrentNode->second.otaStep = STEP_DONE;
+
+				if (nodes.isStepComplete())
+				{
+					setState(RESET_GATEWAY_TO_APPLY_UPDATE);
+				}
+
+				hexPacket_t cmd2 = apiPacket({0x0C, 0x00, 0x84}, pCurrentNode, {0x00, 0x81});
+				for (int i = 0; i < 4; i++)
+					cmd2.push_back(firmware.uf2Block[OFFSET_METADATA_MAGICWORD + i]);
+				firmware.current_progress++;
+#else
+
+				hexPacket_t tail = {0x0E};
+				for (int i = 0; i < 4; i++)
+					tail.push_back(firmware.uf2Block[OFFSET_METADATA_MAGICWORD + i]);
+				// hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x86}, pCurrentNode, tail);
+				hexPacket_t cmd = apiPacket(SMK_UPDATE_OTA_CMD, tail, pCurrentNode->second.local);
+
+				//--- Special register to unlock access to magic word register
+				WriteAndExpectAnwser(pCurrentNode, cmd, SMK_UPDATE_OTA_CMD, "sendmagic", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+																						{
+                        //TIMEOUT
+                        if(!success) {
+                            pNode->second.otaStep = STEP_REJECTED;
+                            PRTF("  Node %06X unable to write magic word\n", macIntToString(pNode->first)); 
+							logJson("Timeout" + macIntToString(pNode->first));
+                            setState(STOP);
+                            return; 
+                        }
+                    
+                        //SUCESS
+						int packet_idx_to_check =(pCurrentNode->second.local)?9:15;
+                        if(packet[packet_idx_to_check]==0x01)
+                        { 
+                            pNode->second.otaStep = STEP_DONE;
+                            pNode->second.labelState = " SUCCES";
+							PRTLN("  magic word ok");
+							logJson("succes " + macIntToString(pNode->second.mac.address));
+                        }
+                        else
+                        {
+                            pNode->second.otaStep = STEP_REJECTED;
+                            pNode->second.labelState = "Update Failed";
+							PRTLN("  magic word not ok");
+                        }
+                        firmware.current_progress++;
+						resetOtaTimeout();
+
+                        
+                        
+                        if(nodes.isStepComplete()) 
+                        {
+							if(firmware.isPyboard())
+							{
+								logJson("STEP DONE");
+								//we need to slow down dyn do allow GPIO EVM to trigger 1.5 second factory reset procedure
+								if(nodes.isThereAtLeastOneOk())
+									setState(SLOW_DYN_FOR_SIM_BUTTON);
+								else
+									setState(STOP);
+							}
+							else
+							{
+								setState(RESET_GATEWAY_TO_APPLY_UPDATE);
+							}
+                        }
+                        PRTF("  Node %06X have received magic word\n", pNode->first); }));
+#endif
+				findNextNode(false,true);
+				ret = true;
+			}
+		}
+	}
+	else if (isState(FORCE_EVM_TRIPPLET))
+	{
+		if (eob && (eob_cnt == 1))
+		{
+			PRTLN("\n--> FORCE_EVM_TRIPPLET_INIT");
+			nodes.resetStep();
+			pCurrentNode = nodes.pool.begin();
+
+			// find a node to update
+			findNextNode(true,true);
+
+			setOtaTimeout(600000);
+			dumpReceivedBuffer();
+		}
+		else if (eob && (eob_cnt >= 2))
+		{
+			if (currentNodeCanBePolled())
+			{
+				PRTF("\n--> FORCE_EVM_TRIPPLET to : %06X\n", pCurrentNode->second.mac.address);
+
+				pCurrentNode->second.otaStep = STEP_WAIT;
+
+				hexPacket_t cmd = apiPacket(SMK_VM_FLASH, {0x09, firmware.evm_len.uint8b[0], firmware.evm_len.uint8b[1], firmware.evm_crc.uint8b[0], firmware.evm_crc.uint8b[1], firmware.evm_main_entry.uint8b[0], firmware.evm_main_entry.uint8b[1]}, pCurrentNode->second.local);
+
+#if SIMULATION_FORCE_EVM_TRIPPLET
+				pCurrentNode->second.otaStep = STEP_DONE;
+
+				if (nodes.isStepComplete())
+				{
+					setState(RESET_GATEWAY_TO_APPLY_UPDATE);
+				}
+
+				firmware.current_progress++;
+
+#else
+
+				//--- Special register to unlock access to magic word register
+				WriteAndExpectAnwser(pCurrentNode, cmd, PACKET_VM_FLASH_RESP, "forcetriplet", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+																						  {
+                        //TIMEOUT
+                        if(!success) {
+                            pNode->second.otaStep = STEP_FAILED;
+                            PRTF("  Node %06X unable to force tripplet\n",pNode->first); 
+                            setState(STOP);
+                            return; 
+                        }
+                    
+                        pNode->second.otaStep = STEP_DONE;
+						pNode->second.labelState = " SUCCES";
+                        firmware.current_progress++;
+
+                        
+                        
+                        if(nodes.isStepComplete()) 
+                        {
+							if(firmware.isPyboard())//nodes.isThereAtLeastOneOk())
+								setState(RESET_GATEWAY_TO_APPLY_UPDATE);
+							else
+								setState(STOP);
+                        }
+                        PRTF("  Node %06X force tripplet success\n", pNode->first); }));
+#endif
+				findNextNode(false,true);
+				ret = true;
+			}
+		}
+	}
+	else if (isState(RESET_GATEWAY_TO_APPLY_UPDATE))
+	{
+		if (eob && eob_cnt ==1)
+		{
+			firmware.close();
+			setOtaTimeout(4500000); // wait a long delay to have time for reboot and resynch to mesh
+			PRTLN("\n--> RESET_GATEWAY_TO_APPLY_UPDATE");
+			logJson("Reset gateway");
+			//write(apiPacket(SMK_SOFT_RESET, {0}, LOCAL));
+
+			digitalWrite(RESET_PORTIA,LOW);
+		}
+		else if(millis() - step_start_time > 60000)
+		{
+			digitalWrite(RESET_PORTIA,HIGH);
+
+			setMode(UPDATE_NODES_END);
+			if (firmware.isPyboard())
+			{
+				setState(INIT_GATEWAY_REGISTER);
+				// otaResult = "success transfert at " +getTimeFormated();
+			}
+			else
+			{
+				setState(READ_VERSION_NODES);
+
+				if (nodes.isLastStepWasOk())
+					otaResult = "*** success transfert at " + getTimeFormated() + " ***";
+				else
+					otaResult = "some node havent been updated " + getTimeFormated();
+				firmware.current_progress = firmware.max_progress;
+			}
+		}
+		else
+		{
+			delay(100);
+			//PRTLN("WAIT");
+		}
+	}
+
+	else if (isState(ABORT_OTA_ENGINE))
+	{
+		if (eob)
+		{
+			PRT("ABORT OTA ENGINE (not implemented)");
+		}
+	}
+
+	else if (isState(SLOW_DYN_FOR_SIM_BUTTON))
+	{
+		if (!eob)	return false;
+		if(eob &&(eob_cnt==1))
+		{
+			setOtaTimeout(300000);
+			return false;
+		}
+
+		PRTLN("\n--> SLOW_DYN_FOR_SIM_BUTTON");
+		logJson("SLOW_DYN_FOR_SIM_BUTTON");
+
+		hexPacket_t cmd = apiPacket(0x0A, {1, 1, 8, 1, 0, 40}, LOCAL); // ret reg 2 DYN
+
+
+#if SIMULATION_SLOW_DYN_FOR_SIM_BUTTON
+		setState(RESET_FACTORY_PYBOARD_INIT);
+#else
+		WriteAndExpectAnwser(gateway, cmd, 0x1A, "slowdynpyboard", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+																		{
+            //TIMEOUT
+            if(!success) {
+                pNode->second.otaStep = STEP_FAILED;
+                PRTLN("  Unable to slow speed for sim pyboard button"); return; 
+				
+            }
+        
+            //SUCESS
+			logJson("SLOW DOWN SUCCESS");
+			
+            setState(RESET_FACTORY_PYBOARD_INIT);
+            resetOtaTimeout();
+            doProcessState = true; }));
+		doProcessState = false;
+		delay(50);
+#endif
+		ret = true;
+	}
+	else if (isState(RESET_FACTORY_PYBOARD_INIT))
+	{
+		setOtaTimeout(600000);
+		PRTLN("\n--> RESET_FACTORY_PYBOARD_INIT");
+		logJson("RESET_FACTORY_PYBOARD_INIT");
+		
+		nodes.resetStep();
+		pCurrentNode = nodes.pool.begin();
+
+		if(findNextNode(true,true))
+			setState(RESET_FACTORY_PYBOARD);
+		else
+			setState(STOP);
+
+		dumpReceivedBuffer();
+	}
+
+	else if (isState(RESET_FACTORY_PYBOARD))
+	{
+#if SIMULATION_RESET_FACTORY_PYBOARD
+		PRT("\n--> RESET_FACTORY_PYBOARD of: ");
+		PRTF("%06X \n", pCurrentNode->second.mac.address);
+		hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x8E}, pCurrentNode, {0x03});
+		pCurrentNode->second.otaStep = STEP_DONE;
+		findNextNode();
+		if (nodes.isStepComplete())
+			setState(GET_SPEED_DYN);
+		doProcessState = true;
+#else
+		if (eob)
+		{
+			if (currentNodeCanBePolled())
+			{
+				PRTF("\n--> RESET_FACTORY_PYBOARD: %06X\n", pCurrentNode->first);
+				logJson("Reset fatory of "  + macIntToString(pCurrentNode->second.mac.address));
+				pCurrentNode->second.otaStep = STEP_WAIT;
+
+				// hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x8E}, pCurrentNode, {0x03});
+				hexPacket_t cmd = apiPacket(SMK_VM_EXEC, {0x03}, pCurrentNode->second.local);
+
+				WriteAndExpectAnwser(pCurrentNode, cmd, PACKET_VM_RESP, "resetfactory", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+																					   {
+                    //TIMEOUT
+                    if(!success) {
+                        pNode->second.otaStep = STEP_FAILED;
+                        PRTF(" Node %06X unable apply factory reset.\n", pNode->first); 
+						
+
+						if(pNode->second.nbFailed++ >10)
+						{
+							pNode->second.otaStep = STEP_DONE;
+							logJson("assume reset factory is done "  + macIntToString(pCurrentNode->second.mac.address));
+						}
+						else logJson("unable to confirm reset fatory of "  + macIntToString(pCurrentNode->second.mac.address));
+                        return; 
+                    }
+                
+                    //SUCESS
+                    pNode->second.otaStep = STEP_DONE;
+                    firmware.current_progress++;
+                    
+                    if(nodes.isStepComplete()){
+						PRTLN("RESET FACTORY STEP");
+						setState(RESET_GATEWAY_TO_APPLY_UPDATE);
+					}
+                    doProcessState = true;
+                    resetOtaTimeout();
+                    PRTF(" Node %06X have been reset to factory state\n", pNode->first); }));
+				ret = true;
+
+				findNextNode(false,true);
+			}
+		}
+#endif
+	}
+
+	else if (isState(PYBOARD_CHECK_PROGRESS_INIT))
+	{
+
+		logJson("PYBOARD_CHECK_PROGRESS");
+		nodes.resetStep();
+		pCurrentNode = nodes.pool.begin();
+		findNextNode(true,true);
+
+		setState(PYBOARD_CHECK_PROGRESS);
+
+		setOtaTimeout(600000);
+		dumpReceivedBuffer();
+	}
+
+	else if (isState(PYBOARD_CHECK_PROGRESS))
+	{
+// PRTLN("\n--> PRIME_NODE_TO_UPDATE");
+#if SIMULATION_PYBOARD_CHECK_PROGRESS
+		PRT("\n--> PYBOARD_CHECK_PROGRESS of: ");
+		PRTF("%06X \n", pCurrentNode->second.mac.address);
+		hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x8E}, pCurrentNode, {0x07});
+		pCurrentNode->second.otaStep = STEP_DONE;
+		findNextNode(false,true);
+		if (nodes.isStepComplete())
+		{
+			setState(STOP);
+			firmware.current_progress = firmware.max_progress;
+		}
+#else
+		int16_t nbToUpdate = getNumberOfNodeToUpdate();
+		int polling_on_eob_cnt = 6;
+		int polling_rate = polling_on_eob_cnt - nbToUpdate;
+		if (polling_rate < 1) polling_rate = 1;
+
+
+		if (eob/* && (eob_cnt > polling_rate)*/)
+		{
+			eob_cnt = 1;
+			// PRTLN("\n--> EOB PRIME_NODE_TO_UPDATE");
+
+			// pCurrentNode->second.otaStep=STEP_WAIT;
+
+			// hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x8E}, pCurrentNode, {0x07});
+			hexPacket_t cmd = apiPacket(SMK_VM_EXEC, {0x07}, pCurrentNode->second.local);
+
+			PRTLN("\n--> PYBOARD_CHECK_PROGRESS: ");
+
+			if (1) // pCurrentNode->second.otaStep==STEP_INIT || pCurrentNode->second.otaStep==STEP_FAILED)
+			{
+				WriteAndExpectAnwser(pCurrentNode, cmd, PACKET_VM_RESP, "pyprogress", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+																					   {
+                    //TIMEOUT
+                    if(!success) {
+						//portENTER_CRITICAL(&mmux);	
+                        pNode->second.otaStep = STEP_WAIT;
+						//portEXIT_CRITICAL(&mmux);
+                        PRTF(" Node %06X unable get transfert to pyboard progress\n", pNode->first);
+                        return; 
+                    }
+                
+
+                    //SUCESS
+					if(packet.size() == 20)
+					{
+						uint32_t c = extractU32(packet,12);
+						uint32_t t = extractU32(packet,16);
+
+						PRT("  ESP.getFreeHeap() ");
+						PRTLN(ESP.getFreeHeap());
+
+
+
+						
+						firmware.current_progress++;
+						
+						PRT("  current progress ");
+						float perc_transfert = c*100.0;
+						perc_transfert /=t;
+						if (perc_transfert > 100.0) perc_transfert = 100.0;
+						PRTF("  %.1f%% - ",perc_transfert);
+						PRTF2("%d/%d\n", c, t);
+						
+						//taskENTER_CRITICAL(mmux);	
+						pNode->second.otaStep = STEP_TRANSFERT;
+						pNode->second.labelState = String(perc_transfert) + "%";
+
+						if(c >= t){
+							pNode->second.otaStep = STEP_DONE;
+							PRTF("  success node: %06X\n", pNode->first);
+						}
+
+						if(nodes.isStepComplete())
+						{
+							otaResult = "success transfert at " +getTimeFormated();
+							setState(STOP);
+						}
+
+						//taskEXIT_CRITICAL(mmux);
+						
+						resetOtaTimeout(); 
+					}
+					else
+					{
+						pNode->second.otaStep = STEP_RETRY;
+						PRT("  error packet size ");
+					} }));
+				ret = true;
+			}
+
+			findNextNode(false,true);
+		}
+#endif
+	}
+
+	else if (isState(STOP))
+	{
+		//firmware.current_progress = firmware.max_progress;
+		PRTLN("\n--> STOP");
+		delay(100);
+#define NO_RESET_AT_END_OF_UPDATE true
+#if NO_RESET_AT_END_OF_UPDATE
+		setMode(INIT_SMK900);
+		setState(INIT_GATEWAY_REGISTER);
+#else
+		if (isMode(UPDATE_NODES_END))
+		{
+			esp_restart();
+		}
+		else
+		{
+			setMode(INIT_SMK900);
+			setState(INIT_GATEWAY_REGISTER);
+		}
+#endif
+	}
+
+	if (getState() != IDLE)
+	{
+
+		if (isOtaTimeoutExpired())
+		{
+
+			PRTLN("\n\nOTA Engine timeout\n\n");
+			setState(IDLE);
+			firmware.close();
+			otaResult = "timeout transfert at " + getTimeFormated();
+			enableAutomaticPolling();
+			return false;
+		}
+	}
+
+	return ret;
+
+	// if timeout ota engine, softshutdown the ota engine
+}

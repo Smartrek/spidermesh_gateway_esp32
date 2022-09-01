@@ -1,0 +1,75 @@
+{
+  "command":
+  {
+    "status":
+    {
+      "rqst":96
+    },
+    "servo_set":{
+      "rqst":64,
+      "len":3,
+      "params":{
+        "id":{"pos":[8,8]},
+        "position":{"pos":[16,8]}
+      }
+    }    
+  },
+  "parser":
+  {
+    "status":{
+      "reply":96,
+      "params":{
+        "alarm_fan1":{"pos":[8,1]},
+        "alarm_fan2":{"pos":[9,1]},
+        "alarm_motor1":{"pos":[10,1]},
+        "alarm_motor2":{"pos":[11,1]},
+        "rssi":{"pos":[16,8]},
+        "ligth1":{"pos":[24,1]},
+        "light2":{"pos":[25,1]},
+        "fan1":{"pos":[26,1]},
+        "fan2":{"pos":[27,1]},
+        "motor1":{"pos":[28,1]},
+        "motor2":{"pos":[29,1]},
+        "position":{"pos":[32,12], "gain":0.01},
+        "mode":{"pos":[44,4]},
+        "temperature":{"pos":[48,12], "div":40.95, "offset":-40.0, "units":"C"},
+        "humidity":{"pos":[60,12], "div":40.95, "units":"%"},
+        "pressure1":{"pos":[72,12], "div":20.475, "units":"PSI"},
+        "pressure2":{"pos":[84,12], "div":4.095, "units":"PSI"},
+        "volt":{"pos":[96,8], "div":4.6363, "units":"V"}
+      }
+    },
+    "time":{
+      "reply":110,
+      "params":{
+        "year":{"pos":[8,16]},
+        "month":{"pos":[24,8]},
+        "day":{"pos":[32,8]},
+        "hour":{"pos":[40,8]},
+        "minute":{"pos":[48,8]},
+        "second":{"pos":[56,8]}
+      }
+    },
+    "output":{
+      "reply":104,
+      "params":{
+        "id":{"pos":[8,8]},
+        "duty":{"pos":[16,8]}
+      }
+    },
+    "version":{
+      "reply":56,
+        "params":{
+          "firmware":{"pos":[8,16]},
+          "subfirmware":{"pos":[24,16]}
+        }
+    },
+    "vm_firmware":{
+      "reply":19,
+      "params":{
+        "version":{"pos":[8,8]},
+        "sub_version":{"pos":[16,8]}
+      }
+    }
+  }
+}

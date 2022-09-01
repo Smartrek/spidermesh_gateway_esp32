@@ -1,0 +1,60 @@
+#ifndef UTILS_H
+#define UTILS_H
+
+#include <Arduino.h>
+#include <list>
+#include <vector>
+#include <rom/rtc.h>
+
+
+union value_converter_union
+{
+	byte uB[4];
+	int8_t B[4];
+	uint16_t uBB[2];
+	int16_t BB[2];
+	uint32_t uBBBB;
+	int32_t BBBB;
+	float F;
+};
+
+union u_bytes
+{
+    uint32_t uint32b;
+    int32_t int32b;
+    uint8_t uint8b[4];
+    uint16_t uint16b[2];
+};
+
+
+typedef std::vector<byte> hexPacket_t;
+#include <esp_drive.h>
+hexPacket_t convertAsciiTohexCommand(const char *asciiCommand);
+bool putPacketInsideBuffer(hexPacket_t packet, uint8_t* buffer);
+void printApiPacket(uint8_t* buffer, int size);
+void printApiPacket(hexPacket_t hcmd, String prefix = "");
+void setupWatchdog(hw_timer_t** pWatchdog, long millis, void (*fn)(void));
+void kickWatchdog(hw_timer_t* watchdog);
+std::vector<String> splitString(String in, char splitChar);
+String cleanString(String toClean);
+String hexPacketToAscii(hexPacket_t hcmd);
+String ApplyFixPoint(word num, int fix);
+hexPacket_t asciiTohexPacket(String acmd);
+void setNtpClock(bool force=false);
+void printLocalTime();
+String getTimeFormated();
+String getMinTimeFormated();
+value_converter_union extractByteFromApiPacket(hexPacket_t p, uint16_t idx, uint16_t len=2);
+
+
+uint32_t extractU32(hexPacket_t p, int pos);
+uint32_t extractU16(hexPacket_t p, int pos);
+std::vector<String> ValidationEthernetConfig(String data);
+
+bool macStringToInt(String ipStr, uint32_t *ip);
+String macIntToString(uint32_t mac);
+
+
+
+
+#endif
