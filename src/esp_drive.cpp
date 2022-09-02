@@ -308,26 +308,6 @@ void appendFile(fs::FS &fs, const char *path, const char *message)
     file.close();
 }
 
-void addDataToNodeFile(String name, String mac, uint8_t type, String data)
-{
-    // If the data.txt file doesn't exist
-    // Create a file on the SD card and write the data labels
-    String fileName = "/" + name + String(type) + ".txt";
-    File file = SD.open(fileName.c_str());
-    if (!file)
-    {
-        Serial.println("File doens't exist");
-        Serial.println("Creating file...");
-        writeFile(SD, fileName.c_str(), "RSSI, Pressure, Temperature, Tension Pile, Sensor Type\r\n");
-    }
-    else
-    {
-        Serial.println("ADD to file:" + fileName + " --> " + data);
-        appendFile(SD, fileName.c_str(), data.c_str());
-    }
-    file.close();
-}
-
 //------------------------------------------------------------------------------
 String readNodeTypeFile()
 {

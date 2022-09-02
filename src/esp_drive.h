@@ -6,9 +6,6 @@
 #include <HardwareProfile.h>
 #include <vector>
 
-#include "FS.h"
-#include "SD.h"
-
 typedef std::vector<String> listFile_t;
 
 void initDrive();
@@ -21,7 +18,6 @@ String splitLine(String in, int* idx);
 
 void appendFile(fs::FS &fs, const char * path, const char * message);
 void writeFile(fs::FS &fs, const char * path, const char * message);
-void addDataToNodeFile(String name, String mac, uint8_t type, String data);
 
 String readNodeListFile();
 bool writeNodeListToFile();

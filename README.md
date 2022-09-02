@@ -8,7 +8,7 @@ This repository is a gateway state machine for the spidermesh network. It is pol
 ESP32 for now
 	
 ### important note
-CTS signal of uart was not supported on old version of arduino platform. This library was tested on Espressif 32 platform 5.1.1 and previous version may not work. There is work around but not as pretty as for this platform.
+CTS signal of uart was not supported on old version of arduino platform. This library was tested on Espressif 32 platform 5.1.1 and previous version may not work. There is work around but not as pretty as for this platform.  Since this project have been mainly tester using platformio, it will work only on the latest version of platformio. Effort will be done soon to make it compatible on arduino ide and older version as well.
 
 ## How to use the library
 Define the callback functions that are enumerated below as you see fit for your application. They are normally defined in the setup function. Then, a call the "enableAutomaticPolling()" function allow the polling of nodes defined. After all have been set, call the begin() function with the speed of the mesh as parameters.
@@ -106,7 +106,7 @@ Callback function to send a customizable request packet on the current automatic
 	}
 
 ### Unicast API call
-The function addWriteExpect() will add the api a packet into a queue and it will be send a the next broadcast cycle. It will pause the automatic polling cycle to allow the custom api call.
+The function addWriteExpect() will add the api a packet into a queue and it will be send at the next broadcast cycle. It will pause temporarerly the automatic polling cycle to allow the custom api call.
 
 	auto p = smk900.find("0.0.96.36");
 	if(p != smk900.nodes.pool.end())
@@ -172,7 +172,9 @@ Here a definition of a basic node that read some value inside a payload
 		}
 	}
 
-NB: Data folder must be uploaded via the (Upload Filesystem Image) platformio button
+### File system
+
+NB: Data folder must be uploaded via the (Platform / Upload Filesystem Image) platformio button
 
 For more information on SMK900 module go to https://www.smartrek.io/download/SMK900_Portia_Summary_V6.pdf
     
