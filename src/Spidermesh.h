@@ -2,7 +2,7 @@
 #ifndef SPIDERMESH
 #define SPIDERMESH
 
-#include "smk900.h"
+#include "spidermeshapi.h"
 
 
 class mesh_step_t
@@ -113,7 +113,7 @@ enum ota_state_get_missing_flag_t
 };
 
 
-class Spidermesh : public Smk900
+class Spidermesh : public SpidermeshApi
 {
 	static bool doProcessState;
 	static ota_mode_t current_mode;

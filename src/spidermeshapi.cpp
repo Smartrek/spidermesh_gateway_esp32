@@ -1,10 +1,6 @@
-#include <smk900.h>
+#include <spidermeshapi.h>
 #include "esp32-hal-uart.h"
 #include "soc/uart_struct.h"
-
-#if MODBUS_REGISTER_ENABLED
-#include "ModbusHelper.h"
-#endif
 
 /*
 #ifdef SIMULATION == SIMULATION_END
@@ -27,56 +23,56 @@
 DynamicJsonDocument type_json(SIZE_OF_DYNAMIC_JSON_FILE);
 
 
-mesh_t::iterator Smk900::gateway;
-mesh_t Smk900::gateway_boot;
-std::list<ExpectAnswer> Smk900::listOfExpectedAnswer;
-bool Smk900::gatewayMacAddressIsReceived=false;
+mesh_t::iterator SpidermeshApi::gateway;
+mesh_t SpidermeshApi::gateway_boot;
+std::list<ExpectAnswer> SpidermeshApi::listOfExpectedAnswer;
+bool SpidermeshApi::gatewayMacAddressIsReceived=false;
 
-SmkList Smk900::nodes;
-ExpectCallback Smk900::cbAutomaticPolling;
-ExpectCallback Smk900::cb_automatic_polling_failed;
-RequestBuilderCallback Smk900::cbAutoRequestBuilder;
-unsigned char Smk900::state_serial;
-mesh_t::iterator Smk900::pCurrentNode;
-bool Smk900::_auto_polling_mode;
-String Smk900::polling_mode;
+SmkList SpidermeshApi::nodes;
+ExpectCallback SpidermeshApi::cbAutomaticPolling;
+ExpectCallback SpidermeshApi::cb_automatic_polling_failed;
+RequestBuilderCallback SpidermeshApi::cbAutoRequestBuilder;
+unsigned char SpidermeshApi::state_serial;
+mesh_t::iterator SpidermeshApi::pCurrentNode;
+bool SpidermeshApi::_auto_polling_mode;
+String SpidermeshApi::polling_mode;
 
 
-uint16_t Smk900::length_packet;
-unsigned char Smk900::idx_buf;
+uint16_t SpidermeshApi::length_packet;
+unsigned char SpidermeshApi::idx_buf;
 
-int Smk900::eob_cnt;
-firmware_t Smk900::firmware;
+int SpidermeshApi::eob_cnt;
+firmware_t SpidermeshApi::firmware;
 
-hexPacket_t Smk900::current_packet;
-std::function<void(hexPacket_t)> Smk900::cbWhenPacketReceived;
-std::function<bool(bool)> Smk900::WhenEobIsReceived;
-uint32_t Smk900::focus_node;
-unsigned long Smk900::focus_node_start_time;
-uint16_t Smk900::_duration_focus_on_node_polling;
-bool Smk900::_otaPacketInCycle;
+apiframe SpidermeshApi::current_packet;
+std::function<void(apiframe)> SpidermeshApi::cbWhenPacketReceived;
+std::function<bool(bool)> SpidermeshApi::WhenEobIsReceived;
+uint32_t SpidermeshApi::focus_node;
+unsigned long SpidermeshApi::focus_node_start_time;
+uint16_t SpidermeshApi::_duration_focus_on_node_polling;
+bool SpidermeshApi::_otaPacketInCycle;
 
-//std::vector <mesh_t::iterator> Smk900::otaList;
+//std::vector <mesh_t::iterator> SpidermeshApi::otaList;
 
-std::list<String> Smk900::terminalBuffer;
-long Smk900::timeout_expect;
-unsigned long Smk900::previousMillisExpectPacketReceived;
-bool Smk900::watchdog_serial_parser;
-unsigned long Smk900::previousMillisPacketParser;
-uint8_t Smk900::idx_polling_cnt;
-portMUX_TYPE Smk900::mmux;
+std::list<String> SpidermeshApi::terminalBuffer;
+long SpidermeshApi::timeout_expect;
+unsigned long SpidermeshApi::previousMillisExpectPacketReceived;
+bool SpidermeshApi::watchdog_serial_parser;
+unsigned long SpidermeshApi::previousMillisPacketParser;
+uint8_t SpidermeshApi::idx_polling_cnt;
+portMUX_TYPE SpidermeshApi::mmux;
 
-WriteAndExpectList_t Smk900::writeAndExpectList;
-commandList_t Smk900::lowPriorityFifoCommandList;
-commandList_t Smk900::highPriorityFifoCommandList;
+WriteAndExpectList_t SpidermeshApi::writeAndExpectList;
+commandList_t SpidermeshApi::lowPriorityFifoCommandList;
+commandList_t SpidermeshApi::highPriorityFifoCommandList;
 
-bool Smk900::show_eob = false;
-bool Smk900::show_apipkt_in = false;
-bool Smk900::show_apipkt_out = false;
+bool SpidermeshApi::show_eob = false;
+bool SpidermeshApi::show_apipkt_in = false;
+bool SpidermeshApi::show_apipkt_out = false;
     
-HardwareSerial Smk900::smkport(2);
+HardwareSerial SpidermeshApi::smkport(2);
 
-Smk900::Smk900()
+SpidermeshApi::SpidermeshApi()
 {
     pinMode(CTS_PORTIA, INPUT);
 
@@ -95,19 +91,19 @@ Smk900::Smk900()
     idx_buf = 0;
 
 
-    cbAutoRequestBuilder = RequestBuilderCallback([](mesh_t::iterator pNode) -> hexPacket_t{hexPacket_t x; return x;});
+    cbAutoRequestBuilder = RequestBuilderCallback([](mesh_t::iterator pNode) -> apiframe{apiframe x; return x;});
 
     //Serial.println("Serial port configured");
 
     length_packet = 0;
     idx_polling_cnt=0;
 
-    cbWhenPacketReceived = [](hexPacket_t){};
+    cbWhenPacketReceived = [](apiframe){};
 
 
 }
 
-bool Smk900::addNewNode(JsonVariant pSource)
+bool SpidermeshApi::addNewNode(JsonVariant pSource)
 {
     bool ret = true;
     JsonObject pay_json = pSource.as<JsonObject>();
@@ -159,7 +155,7 @@ bool Smk900::addNewNode(JsonVariant pSource)
     return ret;
 }
 
-bool Smk900::init()
+bool SpidermeshApi::init()
 {
 
     Serial.print("Serial port... ");
@@ -207,7 +203,7 @@ bool Smk900::init()
 
 
 
-void Smk900::reset()
+void SpidermeshApi::reset()
 {
     digitalWrite(RESET_PORTIA,LOW);
     delay(1000);
@@ -216,12 +212,12 @@ void Smk900::reset()
 }
 
 
-void Smk900::write(uint32_t c)
+void SpidermeshApi::write(uint32_t c)
 {
     //PORTIA_SYNCHRONIZE();
     smkport.write(c);
 }
-void Smk900::write32(uint32_t c)
+void SpidermeshApi::write32(uint32_t c)
 {
     u_bytes u;
     u.uint32b = c;
@@ -232,7 +228,7 @@ void Smk900::write32(uint32_t c)
     smkport.write(u.uint8b[3]);
 }
 
-void Smk900::SaveGatewayMacAddress(hexPacket_t packet)
+void SpidermeshApi::SaveGatewayMacAddress(apiframe packet)
 {
     //Serial.println("EOB packet");
     IPAddress RepliedMacAddress = {packet[10], packet[9], packet[8], packet[7]}; 
@@ -254,7 +250,7 @@ void Smk900::SaveGatewayMacAddress(hexPacket_t packet)
     gatewayMacAddressIsReceived=true;
 }
 
-void Smk900::loadList()
+void SpidermeshApi::loadList()
 {
     JsonVariant type_json_main_file = type_json.as<JsonVariant>();
     
@@ -268,7 +264,7 @@ void Smk900::loadList()
 
 }
 
-hexPacket_t Smk900::localSetRegister(uint8_t offset_register, uint8_t size_register, uint8_t *content)
+apiframe SpidermeshApi::localSetRegister(uint8_t offset_register, uint8_t size_register, uint8_t *content)
 {
     //PORTIA_SYNCHRONIZE();
     uint8_t cmd[20] = {0xFB, 0, 0, 4, 0, offset_register, size_register};
@@ -276,7 +272,7 @@ hexPacket_t Smk900::localSetRegister(uint8_t offset_register, uint8_t size_regis
     uint8_t len = size_register + 4;
     cmd[1] = len;
 
-    hexPacket_t ret;
+    apiframe ret;
     for(int i=0; i<len+3; i++)
     {
         ret.push_back(cmd[i]);
@@ -284,12 +280,12 @@ hexPacket_t Smk900::localSetRegister(uint8_t offset_register, uint8_t size_regis
     return ret;
 }
 
-hexPacket_t Smk900::localTransfertConfigFromRAMBUFF(uint8_t location)
+apiframe SpidermeshApi::localTransfertConfigFromRAMBUFF(uint8_t location)
 {
     //PORTIA_SYNCHRONIZE();
     uint8_t cmd[5] = {0xFB, 2, 0, 0x0B, location};
 
-    hexPacket_t ret;
+    apiframe ret;
 
     for(int i=0; i<5; i++)
     {
@@ -298,12 +294,12 @@ hexPacket_t Smk900::localTransfertConfigFromRAMBUFF(uint8_t location)
     return ret;
 }
 
-hexPacket_t Smk900::setDyn(uint8_t po, uint8_t pi,uint8_t hop, uint8_t rdx, uint8_t rde, uint8_t duty)
+apiframe SpidermeshApi::setDyn(uint8_t po, uint8_t pi,uint8_t hop, uint8_t rdx, uint8_t rde, uint8_t duty)
 {
     //PORTIA_SYNCHRONIZE();
     uint8_t cmd[10] = {0xFB, 7, 0, 0x0A, po, pi, hop, rdx, rde, duty};
 
-    hexPacket_t ret;
+    apiframe ret;
     for(int i=0; i<10; i++)
     {
         ret.push_back(cmd[i]);
@@ -311,13 +307,13 @@ hexPacket_t Smk900::setDyn(uint8_t po, uint8_t pi,uint8_t hop, uint8_t rdx, uint
     return ret;   
 }
 
-hexPacket_t Smk900::requestMacAddress()
+apiframe SpidermeshApi::requestMacAddress()
 {
     //PORTIA_SYNCHRONIZE();    
     Serial.println("==Request Gateway Mac Address");
     uint8_t cmd[20] = {0xFB, 4, 0, 3, 2,0,8};
 
-    hexPacket_t ret;
+    apiframe ret;
     for(int i=0; i<7; i++)
     {
         ret.push_back(cmd[i]);
@@ -326,7 +322,7 @@ hexPacket_t Smk900::requestMacAddress()
 }
 
 //-----------------------------------------------------------------------------------------------
-void Smk900::task()
+void SpidermeshApi::task()
 {
     //manage serial port reception
     if(!parseReceivedData()) delay(10);
@@ -335,7 +331,7 @@ void Smk900::task()
     if(!isMessageStackEmpty())
     {
         
-        hexPacket_t cmd = checkNextPacketToSend();
+        apiframe cmd = checkNextPacketToSend();
         if(cmd.size() >3 )
         {
             //Serial.println("messge stack sent");
@@ -347,7 +343,7 @@ void Smk900::task()
 }
 
 //------------------------------------------------------------------------------------------------
-void Smk900::initWatchdogParser()
+void SpidermeshApi::initWatchdogParser()
 {
     watchdog_serial_parser = true;
     previousMillisPacketParser = millis();
@@ -355,7 +351,7 @@ void Smk900::initWatchdogParser()
 }
 
 //------------------------------------------------------------------------------------------------
-void Smk900::disableWatchdogParser()
+void SpidermeshApi::disableWatchdogParser()
 {
     watchdog_serial_parser = false;
     //LedRemoteOff();
@@ -363,7 +359,7 @@ void Smk900::disableWatchdogParser()
 
 
 //------------------------------------------------------------------------------------------------
-bool Smk900::parseReceivedData()
+bool SpidermeshApi::parseReceivedData()
 {
     bool ret = false;
     if (smkport.available())
@@ -478,14 +474,14 @@ bool Smk900::parseReceivedData()
 
 
 //------------------------------------------------------------------------------------------------
-void Smk900::parseApiFromHost(uint8_t* buf, uint16_t len)
+void SpidermeshApi::parseApiFromHost(uint8_t* buf, uint16_t len)
 {
     uint16_t id_pkt = 0;
     uint8_t state_pkt = STATE_SOF;
     static uint16_t len_pkt;
     uint16_t last_idx_packet = 0;
     commandList_t cmd_list_ok;
-    hexPacket_t cmd_pkt;
+    apiframe cmd_pkt;
 
 
     while(id_pkt < len)
@@ -544,7 +540,7 @@ void Smk900::parseApiFromHost(uint8_t* buf, uint16_t len)
 
 
 //-------------------------------
-String Smk900::sendCommand(hexPacket_t cmd)
+String SpidermeshApi::sendCommand(apiframe cmd)
 {
     for (int i = 0; i < cmd.size(); i++){
         write(cmd[i]);
@@ -563,7 +559,7 @@ String Smk900::sendCommand(hexPacket_t cmd)
     return cmd_out;
 }
 
-void Smk900::AddToTerminalBuffer(String head, hexPacket_t *cmd)
+void SpidermeshApi::AddToTerminalBuffer(String head, apiframe *cmd)
 {
     terminalBuffer.push_back(head +  hexPacketToAscii(*cmd));
 
@@ -578,7 +574,7 @@ void Smk900::AddToTerminalBuffer(String head, hexPacket_t *cmd)
 // It is taking the place of the normal base polling list
 // It should be send after receiving an end of broadcast marker
 //
-bool Smk900::sendNextPacketBuffered()
+bool SpidermeshApi::sendNextPacketBuffered()
 {
     bool ret = false;
 
@@ -588,7 +584,7 @@ bool Smk900::sendNextPacketBuffered()
     #if SHOW_TRANSMITED_PACKET_TO_SMK900 && 0
         Serial.print("on demand cmd sent: ");
     #endif
-        hexPacket_t cmd;
+        apiframe cmd;
         if(highPriorityFifoCommandList.size() > 0)
         {
             cmd = highPriorityFifoCommandList.front();
@@ -606,7 +602,7 @@ bool Smk900::sendNextPacketBuffered()
             //Serial.printf("writeAndExpectList.size():%d\r\n",writeAndExpectList.size());
             MeshRequest_t req = writeAndExpectList.front();
             writeAndExpectList.pop_front();
-            WriteAndExpectAnwser(req.pNode, req.payload, PACKET_VM_RESP, req.topic, req.callback);
+            WriteAndExpectAnwser(req.pNode, req.payload, PACKET_VM_RESP, req.tag, req.callback);
         }
         else 
         
@@ -617,7 +613,7 @@ bool Smk900::sendNextPacketBuffered()
     return ret;
 }
 
-unsigned int Smk900::toInt(byte c)
+unsigned int SpidermeshApi::toInt(byte c)
 {
     if (c >= '0' && c <= '9')
         return c - '0';
@@ -631,18 +627,18 @@ unsigned int Smk900::toInt(byte c)
 
 
 
-bool Smk900::addApiPacketLowPriority(String asciiCommand)
+bool SpidermeshApi::addApiPacketLowPriority(String asciiCommand)
 {
 
-    hexPacket_t od_pkt = convertAsciiTohexCommand(asciiCommand.c_str());
+    apiframe od_pkt = convertAsciiTohexCommand(asciiCommand.c_str());
     //printApiPacket(od_pkt);
     addApiPacketLowPriority(od_pkt);
     return true;
 }
 
-bool Smk900::addApiPacketLowPriority(uint8_t* buffer, int size)
+bool SpidermeshApi::addApiPacketLowPriority(uint8_t* buffer, int size)
 {
-    hexPacket_t buf_hex;
+    apiframe buf_hex;
     for(int i=0; i<size;i++)
     {
         buf_hex.push_back(buffer[i]);
@@ -651,14 +647,14 @@ bool Smk900::addApiPacketLowPriority(uint8_t* buffer, int size)
     return true;
 }
 /*
-bool Smk900::addApiPacketLowPriority(hexPacket_t hcmd)
+bool SpidermeshApi::addApiPacketLowPriority(apiframe hcmd)
 {
     lowPriorityFifoCommandList.push_back(hcmd);
     return true;
 }
 */
 
-bool Smk900::addApiPacketLowPriority(hexPacket_t hcmd)
+bool SpidermeshApi::addApiPacketLowPriority(apiframe hcmd)
 {
     if(lowPriorityFifoCommandList.size() <= PORTIA_FIFO_LOW_PRIORITY_SIZE)
     {
@@ -686,7 +682,7 @@ bool Smk900::addApiPacketLowPriority(hexPacket_t hcmd)
 }
 
 
-bool Smk900::addApiPacketHighPriority(hexPacket_t hcmd)
+bool SpidermeshApi::addApiPacketHighPriority(apiframe hcmd)
 {
     if(highPriorityFifoCommandList.size() <= PORTIA_FIFO_HIGH_PRIORITY_SIZE)
     {
@@ -705,29 +701,29 @@ bool Smk900::addApiPacketHighPriority(hexPacket_t hcmd)
 
 
 
-void Smk900::WriteAndExpectAnwser(mesh_t::iterator pNode, hexPacket_t request, uint8_t packet_type, String topic, ExpectCallback cb)
+void SpidermeshApi::WriteAndExpectAnwser(mesh_t::iterator pNode, apiframe request, uint8_t packet_type, String tag, ExpectCallback cb)
 {
     uint max_retry = DEFAULT_MAX_TRY_TO_SEND;
-    hexPacket_t expectPayload;
+    apiframe expectPayload;
     int16_t size = -1;
 
-    WriteAndExpectAnwser(pNode,request,packet_type,max_retry,expectPayload, size, topic, cb);
+    WriteAndExpectAnwser(pNode,request,packet_type,max_retry,expectPayload, size, tag, cb);
 }
-void Smk900::WriteAndExpectAnwser(mesh_t::iterator pNode, hexPacket_t request, uint8_t packet_type, uint8_t max_retry, String topic,ExpectCallback cb)
+void SpidermeshApi::WriteAndExpectAnwser(mesh_t::iterator pNode, apiframe request, uint8_t packet_type, uint8_t max_retry, String tag,ExpectCallback cb)
 {
-    hexPacket_t expectPayload;
+    apiframe expectPayload;
     int16_t size = -1;
 
-    WriteAndExpectAnwser(pNode,request,packet_type,max_retry,expectPayload, size, topic, cb);
+    WriteAndExpectAnwser(pNode,request,packet_type,max_retry,expectPayload, size, tag, cb);
 }
 
-void Smk900::WriteAndExpectAnwser(  mesh_t::iterator pNode, 
-                                    hexPacket_t request, 
+void SpidermeshApi::WriteAndExpectAnwser(  mesh_t::iterator pNode, 
+                                    apiframe request, 
                                     uint8_t packet_type,                                      
                                     uint8_t max_retry, 
-                                    hexPacket_t expectPayload, 
+                                    apiframe expectPayload, 
                                     int16_t size, 
-                                    String topic,
+                                    String tag,
                                     ExpectCallback cb)
 {
   #if SHOW_EXPECT_EVENT
@@ -746,7 +742,9 @@ void Smk900::WriteAndExpectAnwser(  mesh_t::iterator pNode,
     {
         if(listOfExpectedAnswer.size() < MAX_EXPECT_LIST)
         {
-            ExpectAnswer toWaitAnswerElem(pNode, packet_type, request, cb, topic, max_retry, expectPayload, size);
+
+
+            ExpectAnswer toWaitAnswerElem(pNode, packet_type, request, cb, tag, max_retry, expectPayload, size);
             listOfExpectedAnswer.push_back(toWaitAnswerElem);
             sendCommand(request);
         }
@@ -756,13 +754,13 @@ void Smk900::WriteAndExpectAnwser(  mesh_t::iterator pNode,
     #endif
     else  PRTLN("Already in Expected list");
 }
-//void Smk900::
+//void SpidermeshApi::
 
 
 
 
 
-void Smk900::CheckIfAnswerWasExpectedAndCallSuccessFunction(hexPacket_t rxPkt)
+void SpidermeshApi::CheckIfAnswerWasExpectedAndCallSuccessFunction(apiframe rxPkt)
 {
   #if SHOW_EXPECT_EVENT
     //Serial.println("CheckIfAnswerWasExpectedAndCallSuccessFunction()");
@@ -789,7 +787,7 @@ void Smk900::CheckIfAnswerWasExpectedAndCallSuccessFunction(hexPacket_t rxPkt)
                     #if SHOW_EXPECT_EVENT
                         Serial.println(" = expect local match found ");
                     #endif
-                        i->_expect_callback(i->_pNode, rxPkt, true, i->_topic);
+                        i->_expect_callback(i->_pNode, rxPkt, true, i->_tag);
                         i=listOfExpectedAnswer.erase(i);
                     #if SHOW_EXPECT_EVENT
                         Serial.println(" = callback done");
@@ -829,7 +827,7 @@ void Smk900::CheckIfAnswerWasExpectedAndCallSuccessFunction(hexPacket_t rxPkt)
                     Helper::PollPacketToModbusRegister(i->_pNode, rxPkt);
                     #endif
 
-                    i->_expect_callback(i->_pNode, rxPkt, true, i->_topic);
+                    i->_expect_callback(i->_pNode, rxPkt, true, i->_tag);
 
                      i->_pNode->second.dataValid = true;
                   #if SHOW_EXPECT_EVENT
@@ -857,7 +855,7 @@ void Smk900::CheckIfAnswerWasExpectedAndCallSuccessFunction(hexPacket_t rxPkt)
 //apres le nombre de retry sans réponse, le node est considéré comme dead
 // 
 
-void Smk900::CheckExpectTimeout()
+void SpidermeshApi::CheckExpectTimeout()
 {
   #if SHOW_EXPECT_EVENT
     //Serial.println("CheckExpectTimeout()"); delay(100);
@@ -883,12 +881,12 @@ void Smk900::CheckExpectTimeout()
               #endif
                 if(i->_nb_eob_recv > i->_max_nb_eob_recv)
                 {
-                    hexPacket_t dummy;
+                    apiframe dummy;
                   #if SHOW_EXPECT_EVENT
                     Serial.println("  data validity FALSE <---- " + i->_pNode->second.name);
                   #endif
                      i->_pNode->second.dataValid=false;
-                    i->_expect_callback(i->_pNode, dummy, false, i->_topic);//if user want to do something
+                    i->_expect_callback(i->_pNode, dummy, false, i->_tag);//if user want to do something
 
                     i=listOfExpectedAnswer.erase(i);
                 }
@@ -910,7 +908,7 @@ void Smk900::CheckExpectTimeout()
 }
 
 
-void Smk900::automaticNodePolling()
+void SpidermeshApi::automaticNodePolling()
 {
     static bool current_focus_cycle = true;
   #if SHOW_AUTOMATIC_POLLING
@@ -921,7 +919,7 @@ void Smk900::automaticNodePolling()
     //if there are nodes to poll
     if(nodes.pool.size() > 0)
     {
-        hexPacket_t smkPacket;
+        apiframe smkPacket;
         //bool must_increase_polling_iterator = false;
         mesh_t::iterator pPoll = nodes.pool.end();
 
@@ -1015,12 +1013,12 @@ void Smk900::automaticNodePolling()
             #endif
             pPoll->second.elapse_time = seconds;
             String t = pPoll->second.type; 
-            hexPacket_t rqt_status;
+            apiframe rqt_status;
 
             //we build the request frame 
             
             
-            hexPacket_t user_req_to_append = cbAutoRequestBuilder(pPoll);
+            apiframe user_req_to_append = cbAutoRequestBuilder(pPoll);
 
             if(user_req_to_append.size() >0) rqt_status = user_req_to_append;
             else if(type_json[t]["command"].containsKey("status"))
@@ -1058,7 +1056,7 @@ void Smk900::automaticNodePolling()
 }
 
 
-bool Smk900::enableAutomaticPolling(String mode,String mac, uint16_t duration){
+bool SpidermeshApi::enableAutomaticPolling(String mode,String mac, uint16_t duration){
     bool ret = true;
 
 
@@ -1093,7 +1091,7 @@ bool Smk900::enableAutomaticPolling(String mode,String mac, uint16_t duration){
 }
 
 #define DEBUG_FINDNEXT false
-bool Smk900::findNext(bool onlyRemote, bool initSearch)
+bool SpidermeshApi::findNext(bool onlyRemote, bool initSearch)
 {
 	bool ret = false;
 	mesh_t::iterator next = pCurrentNode;

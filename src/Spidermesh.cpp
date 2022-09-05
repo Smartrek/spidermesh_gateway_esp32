@@ -1,5 +1,5 @@
 #include "Spidermesh.h"
-#include <smk900.h>
+#include <spidermeshapi.h>
 
 #define SKIP_NODE_WHEN_MISSING_PAGE_OLD_VERSION false
 #define FORCE_UNICAST_SENDING_MISSING_FLAG true
@@ -91,10 +91,10 @@ void Spidermesh::smkGatewayTaskCore(void *pvParameters)
 
 	//setlogBuffer(&logBuffer);
 	delay(1000);
-	if (!Smk900::init())
+	if (!SpidermeshApi::init())
 		Serial.println("Error in typejson_document");
 
-	Smk900::setWhenEobIsReceived(ProcessState);
+	SpidermeshApi::setWhenEobIsReceived(ProcessState);
 
 
     setMode(INIT_SMK900);
@@ -114,7 +114,7 @@ void Spidermesh::smkGatewayTaskCore(void *pvParameters)
 
 void Spidermesh::task()
 {
-	Smk900::task();
+	SpidermeshApi::task();
     ProcessState(false);
 
   #ifdef WATCHDOG_SMK900_ENABLE
@@ -137,7 +137,6 @@ bool Spidermesh::findNextNode(bool initSearch, bool otaActiveOnly)
 	bool ret = false;
 	auto next = pCurrentNode;
 
-	//Smk900::findNext(false, initSearch);
 
 	int nbCheck = 0;
 	while (nbCheck < nodes.pool.size())
@@ -241,8 +240,8 @@ void Spidermesh::launchUpdateOtaEngine()
 void Spidermesh::abortOtaEngine()
 {
 	PRT("ABORT UPDATE ENGINE");
-	// hexPacket_t msg = apiPacket({0x0C, 0x00, 0xC6, 0x02});
-	hexPacket_t msg = apiPacket(0x06, {0x02}, false, true);
+	// apiframe msg = apiPacket({0x0C, 0x00, 0xC6, 0x02});
+	apiframe msg = apiPacket(0x06, {0x02}, false, true);
 	write(msg);
 
 	/*
@@ -493,13 +492,13 @@ bool Spidermesh::ProcessState(bool eob)
 		// https://www.learncpp.com/cpp-tutorial/lambda-captures/
 
 		setOtaTimeout(50000);
-		hexPacket_t cmd1 = apiPacket(SMK_WRITE_REG, {0x00, 17, 0x01, 0x01}, LOCAL);
+		apiframe cmd1 = apiPacket(SMK_WRITE_REG, {0x00, 17, 0x01, 0x01}, LOCAL);
 
 		//mesh_t gateway_boot;
 		SmkNode g;
 		gateway_boot.insert(std::make_pair(0,g));
 
-		WriteAndExpectAnwser(gateway_boot.begin(), cmd1, 0x14, 6, "init", ExpectCallback([](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+		WriteAndExpectAnwser(gateway_boot.begin(), cmd1, 0x14, 6, "init", ExpectCallback([](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																			{
             if(!success) { Serial.println(" Error: Unable to set EOB flag"); return; }
 
@@ -508,31 +507,31 @@ bool Spidermesh::ProcessState(bool eob)
 #endif
 
             //uint8_t uart_setting[10] = {0x0E, 0,0,0,0,0,100,0};
-            //hexPacket_t cmd2 = localSetRegister(34,8,uart_setting); //Enable sleep for the gateway in order to fix esd bug...
-			hexPacket_t cmd2 = apiPacket(SMK_WRITE_REG, {0x00, 34, 0x08, 0x0E, 0,0,0,0,0,100,0}, LOCAL);
+            //apiframe cmd2 = localSetRegister(34,8,uart_setting); //Enable sleep for the gateway in order to fix esd bug...
+			apiframe cmd2 = apiPacket(SMK_WRITE_REG, {0x00, 34, 0x08, 0x0E, 0,0,0,0,0,100,0}, LOCAL);
 			
 
-            WriteAndExpectAnwser(gateway_boot.begin(), cmd2,0x14,  "init", ExpectCallback([](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) ->void {
+            WriteAndExpectAnwser(gateway_boot.begin(), cmd2,0x14,  "init", ExpectCallback([](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void {
                 if(!success) { return; }
 #if SHOW_SMK900_INIT
                 Serial.println(pNode->second.name + " reg 34 writen");
 #endif
 				//log[String(millis())] = "EOB written";
             
-                //hexPacket_t cmd3 = localTransfertConfigFromRAMBUFF(1); //transfert it to RAM to enable config sent
+                //apiframe cmd3 = localTransfertConfigFromRAMBUFF(1); //transfert it to RAM to enable config sent
 				//    uint8_t cmd[5] = {0xFB, 2, 0, 0x0B, location};
-				hexPacket_t cmd3 = apiPacket(SMK_TRANSFERT_MEM, {0x01}, LOCAL);
-                WriteAndExpectAnwser(gateway_boot.begin(), cmd3, 0x1B,  "init", ExpectCallback([](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) ->void {
+				apiframe cmd3 = apiPacket(SMK_TRANSFERT_MEM, {0x01}, LOCAL);
+                WriteAndExpectAnwser(gateway_boot.begin(), cmd3, 0x1B,  "init", ExpectCallback([](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void {
                     if(!success) { Serial.println(" Node " + pNode->second.name + " is unavailable."); return; }
 #if SHOW_SMK900_INIT
                         Serial.println(pNode->second.name + " transfert to RAM");
 #endif
 
-                        //hexPacket_t cmd5 = requestMacAddress();
+                        //apiframe cmd5 = requestMacAddress();
 						//uint8_t cmd[20] = {0xFB, 4, 0, 3, 2,0,8};
-						hexPacket_t cmd5 = apiPacket(SMK_READ_REG, {0x00, 0x00, 0x08}, LOCAL);
+						apiframe cmd5 = apiPacket(SMK_READ_REG, {0x00, 0x00, 0x08}, LOCAL);
                         
-                        WriteAndExpectAnwser(gateway_boot.begin(), cmd5, 0x13,  "init", ExpectCallback([](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) ->void {
+                        WriteAndExpectAnwser(gateway_boot.begin(), cmd5, 0x13,  "init", ExpectCallback([](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void {
                             if(!success) { Serial.println(" Node " +   pNode->second.name + " is unavailable."); return; }
                             
                             SaveGatewayMacAddress(packet);
@@ -551,7 +550,7 @@ bool Spidermesh::ProcessState(bool eob)
 
 								loadList();
 							}
-							Smk900::findNext(true,true);
+							SpidermeshApi::findNext(true,true);
 							//auto g = gateway;
                             initDone = true;
 							setState(GET_SPEED_DYN);
@@ -582,10 +581,10 @@ bool Spidermesh::ProcessState(bool eob)
 		log[String(millis())] = "GET_SPEED_DYN";
 		setOtaTimeout(50000);
 
-		// hexPacket_t cmd = apiPacket({0x03, 0x01, 0x02, 0x06}); // ret reg 2 DYN
-		hexPacket_t cmd = apiPacket(SMK_READ_REG, {0x00, 2, 6}, LOCAL);
+		// apiframe cmd = apiPacket({0x03, 0x01, 0x02, 0x06}); // ret reg 2 DYN
+		apiframe cmd = apiPacket(SMK_READ_REG, {0x00, 2, 6}, LOCAL);
 
-		WriteAndExpectAnwser(gateway, cmd, 0x13,  "getdyn", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+		WriteAndExpectAnwser(gateway, cmd, 0x13,  "getdyn", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																		{
             //TIMEOUT
             if(!success) {
@@ -647,9 +646,9 @@ bool Spidermesh::ProcessState(bool eob)
 
 
 
-			hexPacket_t cmd = apiPacket(0x0A, {actualMeshSpeed.bo, actualMeshSpeed.bi, h, actualMeshSpeed.rd, actualMeshSpeed.rde, d}, LOCAL); // ret reg 2 DYN
+			apiframe cmd = apiPacket(0x0A, {actualMeshSpeed.bo, actualMeshSpeed.bi, h, actualMeshSpeed.rd, actualMeshSpeed.rde, d}, LOCAL); // ret reg 2 DYN
 
-			WriteAndExpectAnwser(gateway, cmd, 0x1A, "setspeed",ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+			WriteAndExpectAnwser(gateway, cmd, 0x1A, "setspeed",ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																			{
                 //TIMEOUT
                 if(!success) {
@@ -675,12 +674,12 @@ bool Spidermesh::ProcessState(bool eob)
 			log[String(millis())] = "--OK";
 			//__________________________________________
 			PRTLN("\n--> GET_SPEED_RF");
-			// hexPacket_t cmd = apiPacket({0x03, 1, 11, 1}); // reg preset from ram
+			// apiframe cmd = apiPacket({0x03, 1, 11, 1}); // reg preset from ram
 
 
-			hexPacket_t cmd = apiPacket(SMK_READ_REG, {1, 11, 1}, LOCAL); // reg preset from ram
+			apiframe cmd = apiPacket(SMK_READ_REG, {1, 11, 1}, LOCAL); // reg preset from ram
 
-			WriteAndExpectAnwser(gateway, cmd, 0x13, "getpreset", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+			WriteAndExpectAnwser(gateway, cmd, 0x13, "getpreset", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																			{
                 //TIMEOUT
                 if(!success) {
@@ -712,10 +711,10 @@ bool Spidermesh::ProcessState(bool eob)
                 {
                     //__________________________________________
                     PRTLN("\n--> SET_SPEED_RF");
-                    //hexPacket_t cmd = apiPacket({0x04, 0, 11, 1,expectedPresetRF}); 
+                    //apiframe cmd = apiPacket({0x04, 0, 11, 1,expectedPresetRF}); 
 					
-					hexPacket_t cmd = apiPacket(SMK_WRITE_REG, {0, 11, 1, expectedPresetRF}, LOCAL);
-                    WriteAndExpectAnwser(gateway, cmd, 0x14, "getpreset", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) ->void 
+					apiframe cmd = apiPacket(SMK_WRITE_REG, {0, 11, 1, expectedPresetRF}, LOCAL);
+                    WriteAndExpectAnwser(gateway, cmd, 0x14, "getpreset", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void 
                     {
                         //TIMEOUT
                         if(!success) {
@@ -725,9 +724,9 @@ bool Spidermesh::ProcessState(bool eob)
 						log[String(millis())] = "SET_SPEED_RF";
                         //__________________________________________
                         PRTLN("\n--> SAVE TO EEPROM");
-                        //hexPacket_t cmd = apiPacket({0x0B, 2});
-						hexPacket_t cmd = apiPacket(SMK_TRANSFERT_MEM, {2}, LOCAL);
-                        WriteAndExpectAnwser(gateway, cmd, 0x1B, "getpreset", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) ->void 
+                        //apiframe cmd = apiPacket({0x0B, 2});
+						apiframe cmd = apiPacket(SMK_TRANSFERT_MEM, {2}, LOCAL);
+                        WriteAndExpectAnwser(gateway, cmd, 0x1B, "getpreset", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void 
                         {
                             //TIMEOUT
                             if(!success) {
@@ -756,9 +755,9 @@ bool Spidermesh::ProcessState(bool eob)
 
 		//__________________________________________
 		PRTLN("\n--> TEST SERIAL COMM");
-		// hexPacket_t cmd = apiPacket({0x03, 2, 11, 1});
-		hexPacket_t cmd = apiPacket(SMK_READ_REG, {2, 11, 1}, LOCAL);
-		WriteAndExpectAnwser(gateway, cmd, 0x13, 1, "testserial", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+		// apiframe cmd = apiPacket({0x03, 2, 11, 1});
+		apiframe cmd = apiPacket(SMK_READ_REG, {2, 11, 1}, LOCAL);
+		WriteAndExpectAnwser(gateway, cmd, 0x13, 1, "testserial", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																		   {
             //TIMEOUT
             if(!success) {
@@ -810,10 +809,10 @@ bool Spidermesh::ProcessState(bool eob)
 				PRTLN("\n--> READ_VERSION_NODES");
 				pCurrentNode->second.otaStep = STEP_WAIT;
 
-				// hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x83}, pCurrentNode, {0x02, 0x15, 0x01}); // READ VERSION REGISTER
-				hexPacket_t cmd = apiPacket(SMK_READ_REG, {0x02, 0x15, 1}, pCurrentNode->second.local);
+				// apiframe cmd = apiPacket({0x0C, 0x00, 0x83}, pCurrentNode, {0x02, 0x15, 0x01}); // READ VERSION REGISTER
+				apiframe cmd = apiPacket(SMK_READ_REG, {0x02, 0x15, 1}, pCurrentNode->second.local);
 
-				WriteAndExpectAnwser(pCurrentNode, cmd, SMK_READ_REG, "readV1", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+				WriteAndExpectAnwser(pCurrentNode, cmd, SMK_READ_REG, "readV1", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																			 {
                     if(!success) {  //TIMEOUT
                         PRTF("  Node %06X unable to read version.\n", pNode->first); 
@@ -854,9 +853,9 @@ bool Spidermesh::ProcessState(bool eob)
 
                     firmware.current_progress++;
 
-                    //hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x83},pCurrentNode,{0x02, 0x18, 0x02}); // READ SUB VERSION REGISTER
-					hexPacket_t cmd = apiPacket(SMK_READ_REG, {0x02, 0x18, 2},pCurrentNode->second.local);
-                    WriteAndExpectAnwser(pCurrentNode,cmd,SMK_READ_REG, "readV2", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) ->void 
+                    //apiframe cmd = apiPacket({0x0C, 0x00, 0x83},pCurrentNode,{0x02, 0x18, 0x02}); // READ SUB VERSION REGISTER
+					apiframe cmd = apiPacket(SMK_READ_REG, {0x02, 0x18, 2},pCurrentNode->second.local);
+                    WriteAndExpectAnwser(pCurrentNode,cmd,SMK_READ_REG, "readV2", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void 
                     {
                         if(!success) {  //TIMEOUT
                             pNode->second.otaStep = STEP_FAILED;
@@ -877,9 +876,9 @@ bool Spidermesh::ProcessState(bool eob)
                         firmware.current_progress++;
 
 
-                        //hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x83},pCurrentNode,{0x02, 0x19, 0x02}); // READ SUB VERSION REGISTER
-						hexPacket_t cmd = apiPacket(SMK_READ_REG, {0x02, 0x19, 2},pCurrentNode->second.local);
-                        WriteAndExpectAnwser(pCurrentNode,cmd,SMK_READ_REG, "readV3", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) ->void 
+                        //apiframe cmd = apiPacket({0x0C, 0x00, 0x83},pCurrentNode,{0x02, 0x19, 0x02}); // READ SUB VERSION REGISTER
+						apiframe cmd = apiPacket(SMK_READ_REG, {0x02, 0x19, 2},pCurrentNode->second.local);
+                        WriteAndExpectAnwser(pCurrentNode,cmd,SMK_READ_REG, "readV3", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void 
                         {
                             //TIMEOUT
                             if(!success) {
@@ -901,9 +900,9 @@ bool Spidermesh::ProcessState(bool eob)
                             firmware.current_progress++;
 
 
-                            //hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x83},pCurrentNode,{0x02, 0x1A, 0x01}); // READ SUB VERSION REGISTER
-							hexPacket_t cmd = apiPacket(SMK_READ_REG, {0x02, 0x1A, 1},pCurrentNode->second.local);
-                            WriteAndExpectAnwser(pCurrentNode,cmd,SMK_READ_REG, "readV4", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) ->void 
+                            //apiframe cmd = apiPacket({0x0C, 0x00, 0x83},pCurrentNode,{0x02, 0x1A, 0x01}); // READ SUB VERSION REGISTER
+							apiframe cmd = apiPacket(SMK_READ_REG, {0x02, 0x1A, 1},pCurrentNode->second.local);
+                            WriteAndExpectAnwser(pCurrentNode,cmd,SMK_READ_REG, "readV4", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void 
                             {
                                 if(!success) { //TIMEOUT
                                     pNode->second.otaStep = STEP_FAILED;
@@ -987,9 +986,9 @@ bool Spidermesh::ProcessState(bool eob)
 				PRTLN("\n--> READ_PYBOARD_VERSION_NODES");
 				pCurrentNode->second.otaStep = STEP_WAIT;
 
-				// hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x8E}, pCurrentNode, {0x38}); // READ SUB VERSION REGISTER
-				hexPacket_t cmd = apiPacket(SMK_VM_EXEC, {0x38}, pCurrentNode->second.local);
-				WriteAndExpectAnwser(pCurrentNode, cmd, 0x9E, "readpyV", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+				// apiframe cmd = apiPacket({0x0C, 0x00, 0x8E}, pCurrentNode, {0x38}); // READ SUB VERSION REGISTER
+				apiframe cmd = apiPacket(SMK_VM_EXEC, {0x38}, pCurrentNode->second.local);
+				WriteAndExpectAnwser(pCurrentNode, cmd, 0x9E, "readpyV", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																			 {
                     //TIMEOUT
                     if(!success) {
@@ -1123,17 +1122,17 @@ bool Spidermesh::ProcessState(bool eob)
 				PRTLN("\n--> EVM_OTA_START");
 				pCurrentNode->second.otaStep = STEP_WAIT;
 
-				// hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x86}, pCurrentNode, {0x00, firmware.nbBlock.uint8b[0], firmware.nbBlock.uint8b[1]});
+				// apiframe cmd = apiPacket({0x0C, 0x00, 0x86}, pCurrentNode, {0x00, firmware.nbBlock.uint8b[0], firmware.nbBlock.uint8b[1]});
 
 				byte ota_subcommand = 0x00;
 				if (firmware.getType() == EVM)
 					ota_subcommand |= 0x80;
 
-				hexPacket_t cmd = apiPacket(SMK_VM_FLASH, {0x00}, pCurrentNode->second.local); // start evm flash, will stop an active EVM as well if there is any
+				apiframe cmd = apiPacket(SMK_VM_FLASH, {0x00}, pCurrentNode->second.local); // start evm flash, will stop an active EVM as well if there is any
 
 				PRTF("  MAC to evm start %06X\n", pCurrentNode->second.mac.address);
 
-				WriteAndExpectAnwser(pCurrentNode, cmd, PACKET_VM_FLASH_RESP, "evmstart", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+				WriteAndExpectAnwser(pCurrentNode, cmd, PACKET_VM_FLASH_RESP, "evmstart", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																						{
                     //TIMEOUT
                     if(!success) {
@@ -1183,17 +1182,17 @@ bool Spidermesh::ProcessState(bool eob)
 				logJson("PRIME_NODE_TO_UPDATE " + macIntToString(pCurrentNode->second.mac.address));
 				pCurrentNode->second.otaStep = STEP_WAIT;
 
-				// hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x86}, pCurrentNode, {0x00, firmware.nbBlock.uint8b[0], firmware.nbBlock.uint8b[1]});
+				// apiframe cmd = apiPacket({0x0C, 0x00, 0x86}, pCurrentNode, {0x00, firmware.nbBlock.uint8b[0], firmware.nbBlock.uint8b[1]});
 
 				byte ota_subcommand = 0x00;
 				if (firmware.getType() == EVM)
 					ota_subcommand |= 0x80;
 
-				hexPacket_t cmd = apiPacket(SMK_UPDATE_OTA_CMD, {ota_subcommand, firmware.nbBlock.uint8b[0], firmware.nbBlock.uint8b[1]}, pCurrentNode->second.local);
+				apiframe cmd = apiPacket(SMK_UPDATE_OTA_CMD, {ota_subcommand, firmware.nbBlock.uint8b[0], firmware.nbBlock.uint8b[1]}, pCurrentNode->second.local);
 
 				PRTF("  MAC to prime %06X\n", pCurrentNode->second.mac.address);
 
-				WriteAndExpectAnwser(pCurrentNode, cmd, SMK_UPDATE_OTA_CMD, "primenode", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+				WriteAndExpectAnwser(pCurrentNode, cmd, SMK_UPDATE_OTA_CMD, "primenode", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																						{
                     //TIMEOUT
                     if(!success) {
@@ -1273,7 +1272,7 @@ bool Spidermesh::ProcessState(bool eob)
 				if (firmware.getType() == EVM)
 					ota_subcommand |= 0x80;
 
-				hexPacket_t pkt = {ota_subcommand, sPage.uint8b[0], sPage.uint8b[1]};
+				apiframe pkt = {ota_subcommand, sPage.uint8b[0], sPage.uint8b[1]};
 				for (int i = 0; i < SIZE_DATA_PER_PACKET; i++)
 				{
 					// write(firmware.getChunkByte());
@@ -1285,7 +1284,7 @@ bool Spidermesh::ProcessState(bool eob)
 				PRTF("bulk: perc: %4.1f: ", percent);
 				//PRTF("page: %3d - ", firmware.current_block);
 
-				hexPacket_t cmd = apiPacket(SMK_UPDATE_OTA_CMD, pkt, pCurrentNode->second.local, true);
+				apiframe cmd = apiPacket(SMK_UPDATE_OTA_CMD, pkt, pCurrentNode->second.local, true);
 
 				firmware.start_page += NB_PAGE_PER_DATA_PACKET;
 				/*
@@ -1346,12 +1345,12 @@ bool Spidermesh::ProcessState(bool eob)
 			logJson("GETMISSINGFLAGS " + macIntToString(pCurrentNode->second.mac.address));
 			pCurrentNode->second.otaStep = STEP_WAIT;
 
-			// hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x86}, pCurrentNode, {0x07});
+			// apiframe cmd = apiPacket({0x0C, 0x00, 0x86}, pCurrentNode, {0x07});
 
 			byte ota_subcommand = 0x07;
 			if (firmware.getType() == EVM)
 				ota_subcommand |= 0x80;
-			hexPacket_t cmd = apiPacket(SMK_UPDATE_OTA_CMD, {ota_subcommand}, pCurrentNode->second.local);
+			apiframe cmd = apiPacket(SMK_UPDATE_OTA_CMD, {ota_subcommand}, pCurrentNode->second.local);
 
 			PRTF("  MAC to get missing flags: %06X\n", pCurrentNode->first);
 
@@ -1380,7 +1379,7 @@ bool Spidermesh::ProcessState(bool eob)
 #else
 
 			WriteAndExpectAnwser(pCurrentNode, cmd, SMK_UPDATE_OTA_CMD, "getmissflag",
-								 ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+								 ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 												{
                     //TIMEOUT
                     if(!success) {
@@ -1483,11 +1482,11 @@ bool Spidermesh::ProcessState(bool eob)
 			PRT("\n--> SEND_MISSING_PAGE\n");
 			logJson("SEND_MISSING_PAGE for " + macIntToString(pCurrentNode->second.mac.address));
 
-			hexPacket_t payload;
+			apiframe payload;
 
 			auto item = firmware.missing_list.begin();
 
-			hexPacket_t api_packet = {};
+			apiframe api_packet = {};
 			int nb_page_added = 0;
 			if (item != firmware.missing_list.end())
 			{
@@ -1626,14 +1625,14 @@ bool Spidermesh::ProcessState(bool eob)
 		{
 			u_bytes sPage;
 			sPage.uint32b = firmware.start_page;
-			// hexPacket_t pkt = {0x0C, 0x00, 0xC6, 0x09, sPage.uint8b[0], sPage.uint8b[1]};
+			// apiframe pkt = {0x0C, 0x00, 0xC6, 0x09, sPage.uint8b[0], sPage.uint8b[1]};
 
 			byte ota_subcommand = 0x09;
 			//if (firmware.isVmMachine())
 			//	ota_subcommand |= 0x80;
 
 
-			hexPacket_t pkt = {ota_subcommand, sPage.uint8b[0], sPage.uint8b[1]};
+			apiframe pkt = {ota_subcommand, sPage.uint8b[0], sPage.uint8b[1]};
 
 			for (auto c : crc_result_vector)
 			{
@@ -1642,7 +1641,7 @@ bool Spidermesh::ProcessState(bool eob)
 				for (int i = 0; i < 4; i++)
 					pkt.push_back(cb.uint8b[i]);
 			}
-			// hexPacket_t apiPkt = apiPacket(pkt);
+			// apiframe apiPkt = apiPacket(pkt);
 			PRTF("  CRC page: %d  ", firmware.start_page);
 			write(apiPacket(SMK_UPDATE_OTA_CMD, pkt, pCurrentNode->second.local, BROADCAST_TO_PRIMED_NODE));
 			resetOtaTimeout();
@@ -1675,12 +1674,12 @@ bool Spidermesh::ProcessState(bool eob)
 				PRTF("\n--> CHECK_IF_CRC_OK of node %06X\n", pCurrentNode->first);
 				pCurrentNode->second.otaStep = STEP_WAIT;
 
-				// hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x86}, pCurrentNode, {0x13});
+				// apiframe cmd = apiPacket({0x0C, 0x00, 0x86}, pCurrentNode, {0x13});
 				byte ota_subcommand = 0x13;
 				if (firmware.getType() == EVM)
 					ota_subcommand |= 0x80;
 
-				hexPacket_t cmd = apiPacket(SMK_UPDATE_OTA_CMD, {ota_subcommand}, pCurrentNode->second.local);
+				apiframe cmd = apiPacket(SMK_UPDATE_OTA_CMD, {ota_subcommand}, pCurrentNode->second.local);
 
 #if SIMULATION_CHECK_IF_CRC_OK
 				pCurrentNode->second.otaStep = STEP_DONE;
@@ -1688,7 +1687,7 @@ bool Spidermesh::ProcessState(bool eob)
 					setState(SEND_META_DATA_INIT);
 				firmware.current_progress++;
 #else
-				WriteAndExpectAnwser(pCurrentNode, cmd, SMK_UPDATE_OTA_CMD, "checkcrc", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+				WriteAndExpectAnwser(pCurrentNode, cmd, SMK_UPDATE_OTA_CMD, "checkcrc", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																						{
                         //TIMEOUT
                         if(!success) {
@@ -1752,15 +1751,15 @@ bool Spidermesh::ProcessState(bool eob)
 				u_bytes a;
 				a.uint32b = pCurrentNode->second.offset_chunk * (SIZE_DATA_PER_PACKET);
 
-				hexPacket_t payload = {0x0D, a.uint8b[0], a.uint8b[1]};
+				apiframe payload = {0x0D, a.uint8b[0], a.uint8b[1]};
 				uint8_t *pBlock = &firmware.uf2Block[OFFSET_DATA + pCurrentNode->second.offset_chunk * (SIZE_DATA_PER_METADATA_PACKET)];
 				for (int i = 0; i < (SIZE_DATA_PER_METADATA_PACKET); i++)
 				{
 					payload.push_back(pBlock[i]);
 				}
 
-				// hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x86}, pCurrentNode, {0x0D, a.uint8b[0], a.uint8b[1]}, &firmware.uf2Block[OFFSET_DATA + pCurrentNode->second.offset_chunk * SIZE_DATA_PER_PACKET], SIZE_DATA_PER_PACKET);
-				hexPacket_t cmd = apiPacket(SMK_UPDATE_OTA_CMD, payload, pCurrentNode->second.local);
+				// apiframe cmd = apiPacket({0x0C, 0x00, 0x86}, pCurrentNode, {0x0D, a.uint8b[0], a.uint8b[1]}, &firmware.uf2Block[OFFSET_DATA + pCurrentNode->second.offset_chunk * SIZE_DATA_PER_PACKET], SIZE_DATA_PER_PACKET);
+				apiframe cmd = apiPacket(SMK_UPDATE_OTA_CMD, payload, pCurrentNode->second.local);
 
 #if SIMULATION_SEND_META_DATA
 				pCurrentNode->second.offset_chunk++;
@@ -1777,7 +1776,7 @@ bool Spidermesh::ProcessState(bool eob)
 				}
 				firmware.current_progress++;
 #else
-				WriteAndExpectAnwser(pCurrentNode, cmd, SMK_UPDATE_OTA_CMD, "sendmeta", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+				WriteAndExpectAnwser(pCurrentNode, cmd, SMK_UPDATE_OTA_CMD, "sendmeta", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																						{
                         //TIMEOUT
                         if(!success) {
@@ -1830,11 +1829,11 @@ bool Spidermesh::ProcessState(bool eob)
 			PRTF("\n--> RESET_NODE_ON_SEEK: %06X\n", pCurrentNode->first);
 			pCurrentNode->second.otaStep = STEP_WAIT;
 
-			// hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x84}, pCurrentNode, {0x00, 0x81, 0x04, 0xBB, 0xE2, 0x26, 0x38});
-			hexPacket_t cmd = apiPacket(SMK_WRITE_REG, {0x00, 0x81, 0x04, 0xBB, 0xE2, 0x26, 0x38}, pCurrentNode->second.local);
+			// apiframe cmd = apiPacket({0x0C, 0x00, 0x84}, pCurrentNode, {0x00, 0x81, 0x04, 0xBB, 0xE2, 0x26, 0x38});
+			apiframe cmd = apiPacket(SMK_WRITE_REG, {0x00, 0x81, 0x04, 0xBB, 0xE2, 0x26, 0x38}, pCurrentNode->second.local);
 
 #if SIMULATION_RESET_NODE_ON_SEEK
-			hexPacket_t cmd2 = apiPacket({0x0C, 0x00, 0x84}, pCurrentNode, {0x00, 0xA1, 0x04, 0x01, 0x00, 0x00, 0x00});
+			apiframe cmd2 = apiPacket({0x0C, 0x00, 0x84}, pCurrentNode, {0x00, 0xA1, 0x04, 0x01, 0x00, 0x00, 0x00});
 			pCurrentNode->second.otaStep = STEP_DONE;
 			if (nodes.isStepComplete())
 				setState(SEND_MAGICWORD_INIT);
@@ -1845,7 +1844,7 @@ bool Spidermesh::ProcessState(bool eob)
 			pCurrentNode->second.otaStep = STEP_WAIT;
 			//--- Special register to unlock access to magic word register
 			WriteAndExpectAnwser(pCurrentNode, cmd, SMK_WRITE_REG, "resetseek1",
-								 ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+								 ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 												{
 					// TIMEOUT
 					if (!success)
@@ -1856,12 +1855,12 @@ bool Spidermesh::ProcessState(bool eob)
 						return;
 					}
 
-					//hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x84}, pCurrentNode, {0x00, 0xA1, 0x04, 0x01, 0x00, 0x00, 0x00});
-					hexPacket_t cmd = apiPacket(SMK_WRITE_REG, {0x00, 0xA1, 0x04, 0x01, 0x00, 0x00, 0x00}, pCurrentNode->second.local);
+					//apiframe cmd = apiPacket({0x0C, 0x00, 0x84}, pCurrentNode, {0x00, 0xA1, 0x04, 0x01, 0x00, 0x00, 0x00});
+					apiframe cmd = apiPacket(SMK_WRITE_REG, {0x00, 0xA1, 0x04, 0x01, 0x00, 0x00, 0x00}, pCurrentNode->second.local);
 					firmware.current_progress++;
 
 					//--- Special register to unlock access to magic word register
-					WriteAndExpectAnwser(pNode, cmd, SMK_WRITE_REG, "resetseek2", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+					WriteAndExpectAnwser(pNode, cmd, SMK_WRITE_REG, "resetseek2", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																							{
 							//TIMEOUT
 							if(!success) {
@@ -1932,20 +1931,20 @@ bool Spidermesh::ProcessState(bool eob)
 					setState(RESET_GATEWAY_TO_APPLY_UPDATE);
 				}
 
-				hexPacket_t cmd2 = apiPacket({0x0C, 0x00, 0x84}, pCurrentNode, {0x00, 0x81});
+				apiframe cmd2 = apiPacket({0x0C, 0x00, 0x84}, pCurrentNode, {0x00, 0x81});
 				for (int i = 0; i < 4; i++)
 					cmd2.push_back(firmware.uf2Block[OFFSET_METADATA_MAGICWORD + i]);
 				firmware.current_progress++;
 #else
 
-				hexPacket_t tail = {0x0E};
+				apiframe tail = {0x0E};
 				for (int i = 0; i < 4; i++)
 					tail.push_back(firmware.uf2Block[OFFSET_METADATA_MAGICWORD + i]);
-				// hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x86}, pCurrentNode, tail);
-				hexPacket_t cmd = apiPacket(SMK_UPDATE_OTA_CMD, tail, pCurrentNode->second.local);
+				// apiframe cmd = apiPacket({0x0C, 0x00, 0x86}, pCurrentNode, tail);
+				apiframe cmd = apiPacket(SMK_UPDATE_OTA_CMD, tail, pCurrentNode->second.local);
 
 				//--- Special register to unlock access to magic word register
-				WriteAndExpectAnwser(pCurrentNode, cmd, SMK_UPDATE_OTA_CMD, "sendmagic", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+				WriteAndExpectAnwser(pCurrentNode, cmd, SMK_UPDATE_OTA_CMD, "sendmagic", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																						{
                         //TIMEOUT
                         if(!success) {
@@ -2021,7 +2020,7 @@ bool Spidermesh::ProcessState(bool eob)
 
 				pCurrentNode->second.otaStep = STEP_WAIT;
 
-				hexPacket_t cmd = apiPacket(SMK_VM_FLASH, {0x09, firmware.evm_len.uint8b[0], firmware.evm_len.uint8b[1], firmware.evm_crc.uint8b[0], firmware.evm_crc.uint8b[1], firmware.evm_main_entry.uint8b[0], firmware.evm_main_entry.uint8b[1]}, pCurrentNode->second.local);
+				apiframe cmd = apiPacket(SMK_VM_FLASH, {0x09, firmware.evm_len.uint8b[0], firmware.evm_len.uint8b[1], firmware.evm_crc.uint8b[0], firmware.evm_crc.uint8b[1], firmware.evm_main_entry.uint8b[0], firmware.evm_main_entry.uint8b[1]}, pCurrentNode->second.local);
 
 #if SIMULATION_FORCE_EVM_TRIPPLET
 				pCurrentNode->second.otaStep = STEP_DONE;
@@ -2036,7 +2035,7 @@ bool Spidermesh::ProcessState(bool eob)
 #else
 
 				//--- Special register to unlock access to magic word register
-				WriteAndExpectAnwser(pCurrentNode, cmd, PACKET_VM_FLASH_RESP, "forcetriplet", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+				WriteAndExpectAnwser(pCurrentNode, cmd, PACKET_VM_FLASH_RESP, "forcetriplet", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																						  {
                         //TIMEOUT
                         if(!success) {
@@ -2126,13 +2125,13 @@ bool Spidermesh::ProcessState(bool eob)
 		PRTLN("\n--> SLOW_DYN_FOR_SIM_BUTTON");
 		logJson("SLOW_DYN_FOR_SIM_BUTTON");
 
-		hexPacket_t cmd = apiPacket(0x0A, {1, 1, 8, 1, 0, 40}, LOCAL); // ret reg 2 DYN
+		apiframe cmd = apiPacket(0x0A, {1, 1, 8, 1, 0, 40}, LOCAL); // ret reg 2 DYN
 
 
 #if SIMULATION_SLOW_DYN_FOR_SIM_BUTTON
 		setState(RESET_FACTORY_PYBOARD_INIT);
 #else
-		WriteAndExpectAnwser(gateway, cmd, 0x1A, "slowdynpyboard", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+		WriteAndExpectAnwser(gateway, cmd, 0x1A, "slowdynpyboard", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																		{
             //TIMEOUT
             if(!success) {
@@ -2174,7 +2173,7 @@ bool Spidermesh::ProcessState(bool eob)
 #if SIMULATION_RESET_FACTORY_PYBOARD
 		PRT("\n--> RESET_FACTORY_PYBOARD of: ");
 		PRTF("%06X \n", pCurrentNode->second.mac.address);
-		hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x8E}, pCurrentNode, {0x03});
+		apiframe cmd = apiPacket({0x0C, 0x00, 0x8E}, pCurrentNode, {0x03});
 		pCurrentNode->second.otaStep = STEP_DONE;
 		findNextNode();
 		if (nodes.isStepComplete())
@@ -2189,10 +2188,10 @@ bool Spidermesh::ProcessState(bool eob)
 				logJson("Reset fatory of "  + macIntToString(pCurrentNode->second.mac.address));
 				pCurrentNode->second.otaStep = STEP_WAIT;
 
-				// hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x8E}, pCurrentNode, {0x03});
-				hexPacket_t cmd = apiPacket(SMK_VM_EXEC, {0x03}, pCurrentNode->second.local);
+				// apiframe cmd = apiPacket({0x0C, 0x00, 0x8E}, pCurrentNode, {0x03});
+				apiframe cmd = apiPacket(SMK_VM_EXEC, {0x03}, pCurrentNode->second.local);
 
-				WriteAndExpectAnwser(pCurrentNode, cmd, PACKET_VM_RESP, "resetfactory", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+				WriteAndExpectAnwser(pCurrentNode, cmd, PACKET_VM_RESP, "resetfactory", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																					   {
                     //TIMEOUT
                     if(!success) {
@@ -2248,7 +2247,7 @@ bool Spidermesh::ProcessState(bool eob)
 #if SIMULATION_PYBOARD_CHECK_PROGRESS
 		PRT("\n--> PYBOARD_CHECK_PROGRESS of: ");
 		PRTF("%06X \n", pCurrentNode->second.mac.address);
-		hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x8E}, pCurrentNode, {0x07});
+		apiframe cmd = apiPacket({0x0C, 0x00, 0x8E}, pCurrentNode, {0x07});
 		pCurrentNode->second.otaStep = STEP_DONE;
 		findNextNode(false,true);
 		if (nodes.isStepComplete())
@@ -2270,14 +2269,14 @@ bool Spidermesh::ProcessState(bool eob)
 
 			// pCurrentNode->second.otaStep=STEP_WAIT;
 
-			// hexPacket_t cmd = apiPacket({0x0C, 0x00, 0x8E}, pCurrentNode, {0x07});
-			hexPacket_t cmd = apiPacket(SMK_VM_EXEC, {0x07}, pCurrentNode->second.local);
+			// apiframe cmd = apiPacket({0x0C, 0x00, 0x8E}, pCurrentNode, {0x07});
+			apiframe cmd = apiPacket(SMK_VM_EXEC, {0x07}, pCurrentNode->second.local);
 
 			PRTLN("\n--> PYBOARD_CHECK_PROGRESS: ");
 
 			if (1) // pCurrentNode->second.otaStep==STEP_INIT || pCurrentNode->second.otaStep==STEP_FAILED)
 			{
-				WriteAndExpectAnwser(pCurrentNode, cmd, PACKET_VM_RESP, "pyprogress", ExpectCallback([&](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+				WriteAndExpectAnwser(pCurrentNode, cmd, PACKET_VM_RESP, "pyprogress", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																					   {
                     //TIMEOUT
                     if(!success) {

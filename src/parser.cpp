@@ -2,19 +2,19 @@
 
 extern DynamicJsonDocument type_json;
 
-bool SmkParser::rfPayloadToJson(hexPacket_t &packet, String topic, JsonVariant payload, String &type)
+bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payload, String &type)
 {
 	if(packet.size()<=10) return false;
 
   #if SHOW_DEBUG_EXTRACT_DATA
 	Serial.println("\r\n-- Extraction parameter from json definition --");
 	Serial.printf("  --> Packet ID: %d<--\r\n",packet_id);
-	Serial.print ("  --> TOPIC: ");
-	Serial.println (topic);
+	Serial.print ("  --> tag: ");
+	Serial.println (tag);
   #endif
 
 
-	if(type_json[type]["parser"].containsKey(topic))
+	if(type_json[type]["parser"].containsKey(tag))
 	{
 		#if SHOW_DEBUG_EXTRACT_DATA
 		Serial.print("  default status key is founded");
@@ -33,7 +33,7 @@ bool SmkParser::rfPayloadToJson(hexPacket_t &packet, String topic, JsonVariant p
 	}
 
 
-	JsonObject extract_parameters = type_json[type]["parser"][topic]["params"].as<JsonObject>();
+	JsonObject extract_parameters = type_json[type]["parser"][tag]["params"].as<JsonObject>();
 
 	payload["time"]="millis() " + String(millis()); //getTimeFormated();
 
@@ -187,7 +187,7 @@ uint64_t SmkParser::getbits(uint64_t value, uint64_t offset, unsigned n)
 	return value & mask;
 }
 
-bool SmkParser::getlogfromdict(JsonObject def_params, JsonVariant ret_result, hexPacket_t &packet, uint16_t idx, String &type)
+bool SmkParser::getlogfromdict(JsonObject def_params, JsonVariant ret_result, apiframe &packet, uint16_t idx, String &type)
 {
 	bool ret=false;
 	
@@ -289,7 +289,7 @@ bool SmkParser::getlogfromdict(JsonObject def_params, JsonVariant ret_result, he
 	return ret;
 }
 
-bool SmkParser::getErrorFromDict(JsonObject def_params, JsonVariant ret_result, hexPacket_t packet, uint16_t idx, String& stype)
+bool SmkParser::getErrorFromDict(JsonObject def_params, JsonVariant ret_result, apiframe packet, uint16_t idx, String& stype)
 {
 	bool ret=false;
 

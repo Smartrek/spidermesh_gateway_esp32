@@ -119,9 +119,9 @@ public:
         return ret;
     };
 
-    hexPacket_t readNextChunk(int front = -1, int len = 64)
+    apiframe readNextChunk(int front = -1, int len = 64)
     {
-        hexPacket_t ret;
+        apiframe ret;
         int i = 0;
         if (front > 0)
             ret.push_back(front);

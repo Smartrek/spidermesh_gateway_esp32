@@ -52,7 +52,7 @@ Use those function to set the callback describe bellow
 
 Callback function use for the automatic polling of all nodes define in nodes.json.  For parameters of this function, there is the node pointer to know who trigger the function, the packet received, if the response have been succesfully received or if the timeout have been triggered. It is possible as well to parse the raw data here if node type have been define. Automatic polling must be enable.
 
-	void CallbackAutoPolling(mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic)
+	void CallbackAutoPolling(mesh_t::iterator pNode, apiframe packet, bool success, String tag)
 	{
 		//in case was unable to reach node, action can be done here
 		//payload contain nothing if unable to reach node
@@ -70,9 +70,9 @@ Callback function use for the automatic polling of all nodes define in nodes.jso
 		//conversion of individual data from rf payload into JSON variables
 		DynamicJsonDocument reply_json_doc(5000);
 		JsonVariant reply_json = reply_json_doc.as<JsonVariant>();
-		if(SmkParser::rfPayloadToJson(packet, topic, reply_json, pNode->second.type))
+		if(SmkParser::rfPayloadToJson(packet, tag, reply_json, pNode->second.type))
 		{
-			Serial.printf("topic: %s\n", topic.c_str());
+			Serial.printf("tag: %s\n", tag.c_str());
 
 			String prettyjson="";
 			Serial.println("payload:");
@@ -85,7 +85,7 @@ Callback function use for the automatic polling of all nodes define in nodes.jso
 
 Callback function trigger when a Spidermesh API packet is received. For parameters of this function, there is the packet received. The End Of Broadcast packet do not trigger this function. 
 
-	void CallbackWhenPacketReceived(hexPacket_t packet)
+	void CallbackWhenPacketReceived(apiframe packet)
 	{
 		//check if the packet received is a End Of Broadcast cycle (EOB)
 		if(smk900.isEobPacket(packet))
@@ -97,11 +97,11 @@ Callback function trigger when a Spidermesh API packet is received. For paramete
 ### Callback for customizable polling request 
 Callback function to send a customizable request packet on the current automatic roundrobin polling node. For parameters of this function, there is a pointer of Node to know who trigger the callback function. The return packet will be append to the request packet of the virtual machine. For more infomation about the virtual machine, Please consult the SMK900 datasheet. Automatic polling must be enable.
 
-	hexPacket_t CallbackAutoRequestBuilder(mesh_t::iterator pNode)
+	apiframe CallbackAutoRequestBuilder(mesh_t::iterator pNode)
 	{
 		//add the byte 0x60 at the end of the VM request packet.
 		//it will be send immediately after this call
-		hexPacket_t request_packet={0x60};
+		apiframe request_packet={0x60};
 		return request_packet;
 	}
 
@@ -112,13 +112,13 @@ The function addWriteExpect() will add the api a packet into a queue and it will
 	if(p != smk900.nodes.pool.end())
 	{
 		//build the api frame to send a command, when result will be received, it will triger the ExpectCallback function
-		hexPacket_t vm_command = smk900.apiPacket(p, SMK_VM_EXEC, {0x60}, REMOTE);
-		smk900.addWriteExpect(p,vm_command, "status", ExpectCallback([](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void
+		apiframe vm_command = smk900.apiPacket(p, SMK_VM_EXEC, {0x60}, REMOTE);
+		smk900.addWriteExpect(p,vm_command, "status", ExpectCallback([](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 		{
 			if(!success)
 			{
-				Serial.print("topic: ");
-				Serial.print(topic);
+				Serial.print("tag: ");
+				Serial.print(tag);
 				Serial.println(" request failed");
 				return;
 			}
@@ -145,7 +145,7 @@ This file define the node available to poll and what type they are
 	}
 
 ### type/(name of type)/parser.json
-For each definition of node type there is a folder created with the name of the type. Inside of it, there is a file name parser.json. It contain the definition of the payload of the node to allow the parsing machine to extract the data. Payload be be seen as a 128bits and multiple kind of payload are possible named as topic. The minimum topic required is the "status". Inside the element each variables of the nodes type are define using the following convention
+For each definition of node type there is a folder created with the name of the type. Inside of it, there is a file name parser.json. It contain the definition of the payload of the node to allow the parsing machine to extract the data. Payload be be seen as a 128bits and multiple kind of payload are possible named as tag. The minimum tag required is the "status". Inside the element each variables of the nodes type are define using the following convention
 
 	"pos":[(start position), (bit length)]
 

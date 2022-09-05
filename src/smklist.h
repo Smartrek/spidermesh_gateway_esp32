@@ -143,15 +143,15 @@ public:
 };
 
 typedef std::map<uint32_t, SmkNode> mesh_t;
-typedef std::function<void(mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic)> ExpectCallback;
-typedef std::function<hexPacket_t(mesh_t::iterator pNode)> RequestBuilderCallback;
+typedef std::function<void(mesh_t::iterator pNode, apiframe packet, bool success, String tag)> ExpectCallback;
+typedef std::function<apiframe(mesh_t::iterator pNode)> RequestBuilderCallback;
 
 typedef struct
 {
 	mesh_t::iterator pNode;
-	hexPacket_t payload;
+	apiframe payload;
 	ExpectCallback callback;
-	String topic;
+	String tag;
 } MeshRequest_t;
 
 class ParamList_t

@@ -7,12 +7,12 @@
 bool ntpServerSet = false;
 
 
-hexPacket_t convertAsciiTohexCommand(const char *asciiCommand)
+apiframe convertAsciiTohexCommand(const char *asciiCommand)
 {
     // std::stringstream xx;
     String s_cmd = asciiCommand;
     std::vector<String> byte_cmd = splitString(s_cmd,' ');
-    hexPacket_t hexCommand;
+    apiframe hexCommand;
     for (auto b :byte_cmd)
     {
 		int num;
@@ -25,11 +25,11 @@ hexPacket_t convertAsciiTohexCommand(const char *asciiCommand)
 }
 
 
-hexPacket_t asciiTohexPacket(String acmd)
+apiframe asciiTohexPacket(String acmd)
 {
     char c[3];
     c[2]=0;
-    hexPacket_t ret;
+    apiframe ret;
     while(acmd.length()>=2)
     {
         int num;
@@ -43,9 +43,9 @@ hexPacket_t asciiTohexPacket(String acmd)
 }
 
 
-bool putPacketInsideBuffer(hexPacket_t packet, uint8_t* buffer)
+bool putPacketInsideBuffer(apiframe packet, uint8_t* buffer)
 {
-    hexPacket_t buf_hex;
+    apiframe buf_hex;
     for(int i=packet.size()-1; i>=0; i--)
     {
         buffer[i]=packet.back();
@@ -70,7 +70,7 @@ void printApiPacket(uint8_t* buffer, int size)
 }
 
 
-void printApiPacket(hexPacket_t hcmd, String prefix)
+void printApiPacket(apiframe hcmd, String prefix)
 {
     if(hcmd.size()>0)
     {
@@ -80,7 +80,7 @@ void printApiPacket(hexPacket_t hcmd, String prefix)
     }
 }
 
-String hexPacketToAscii(hexPacket_t hcmd)
+String hexPacketToAscii(apiframe hcmd)
 {
     String packet = "";
     char result[6];
@@ -235,7 +235,7 @@ void setNtpClock(bool force)
 }
 
 
-value_converter_union extractByteFromApiPacket(hexPacket_t p, uint16_t idx, uint16_t len)
+value_converter_union extractByteFromApiPacket(apiframe p, uint16_t idx, uint16_t len)
 {
     value_converter_union v;
 
@@ -261,7 +261,7 @@ uint32_t extractU32(String p, int pos){
     return cur;
 };
 
-uint32_t extractU32(hexPacket_t p, int pos){
+uint32_t extractU32(apiframe p, int pos){
     uint32_t cur =0;
     for(int i=3;i>=0;i--)
     {
@@ -271,7 +271,7 @@ uint32_t extractU32(hexPacket_t p, int pos){
     return cur;
 };
 
-uint32_t extractU16(hexPacket_t p, int pos){
+uint32_t extractU16(apiframe p, int pos){
     uint32_t cur =0;
     for(int i=1;i>=0;i--)
     {

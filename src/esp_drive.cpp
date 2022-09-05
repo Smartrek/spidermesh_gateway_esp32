@@ -14,7 +14,7 @@
 
 */
 #include <esp_drive.h>
-#include <smk900.h>
+#include <spidermeshapi.h>
 
 #ifndef SHOW_DEBUG_DRIVE
 #define SHOW_DEBUG_DRIVE true
