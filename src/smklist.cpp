@@ -293,8 +293,8 @@ bool SmkList::add(uint32_t mac, String type, bool local, String group, String na
   #endif  
 
     //if the node exist update it
-    Serial.printf("Alink ");
-    Serial.printf(macInt2String(mac).c_str());
+    Serial.printf("Node ");
+    Serial.print(x.getMacAsString());
     if ( find(mac_32bit) != pool.end() )
     {
         Serial.println(" have been updated");

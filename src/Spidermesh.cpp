@@ -137,6 +137,8 @@ bool Spidermesh::findNextNode(bool initSearch, bool otaActiveOnly)
 	bool ret = false;
 	auto next = pCurrentNode;
 
+	if(initSearch) next=nodes.pool.begin();
+
 
 	int nbCheck = 0;
 	while (nbCheck < nodes.pool.size())
@@ -144,12 +146,15 @@ bool Spidermesh::findNextNode(bool initSearch, bool otaActiveOnly)
 		if (next == nodes.pool.end())
 			next = nodes.pool.begin();
 
-		if ((next->second.otaActive || !otaActiveOnly) && next->second.otaStep != STEP_DONE && next->second.otaStep != STEP_REJECTED )
+		if ((next->second.otaActive || !otaActiveOnly) && (next->second.otaStep != STEP_DONE) && (next->second.otaStep != STEP_REJECTED) )
 		{
 			pCurrentNode = next;
+			Serial.print("Node Found:");
+			Serial.println(macIntToString(pCurrentNode->first));
 			ret = true;
 			break;
 		}
+		else {Serial.println("++");}
 		nbCheck++;
 		next++;
 	}
@@ -541,14 +546,16 @@ bool Spidermesh::ProcessState(bool eob)
 
 							if(!initDone)
 							{
+								//loadList();
+
 								nodes.pool.clear(); 
+								nodes.loadParamFiles();
 								nodes.add(a, "gateway", LOCAL, "main", "main gateway");
 								gateway=nodes.pool.begin();
 
 								PRT("GATEWAY mac is: ");
 								PRTLN(smac);
 
-								loadList();
 							}
 							SpidermeshApi::findNext(true,true);
 							//auto g = gateway;
@@ -815,14 +822,14 @@ bool Spidermesh::ProcessState(bool eob)
 				WriteAndExpectAnwser(pCurrentNode, cmd, SMK_READ_REG, "readV1", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																			 {
                     if(!success) {  //TIMEOUT
-                        PRTF("  Node %06X unable to read version.\n", pNode->first); 
+                        PRTF("  Node %s unable to read version.\n", pNode->second.getMacAsString().c_str()); 
                         if(isMode(READ_VERSION_SMK900))
                         {
                             pNode->second.otaStep = STEP_REJECTED;
                             pNode->second.labelState = "Timeout";
 							logJson("Timeout");
                             
-                            PRTF("  Node %06X rejected.\n", pNode->first);
+                            PRTF("  Node %s rejected.\n", pNode->second.getMacAsString());
                             findNextNode(false,!isMode(READ_VERSION_SMK900));
                             if(nodes.isStepComplete()) 
                             {
@@ -859,7 +866,7 @@ bool Spidermesh::ProcessState(bool eob)
                     {
                         if(!success) {  //TIMEOUT
                             pNode->second.otaStep = STEP_FAILED;
-                            PRTF("  Node %06X unable read subversion.\n", pNode->first); 
+                            PRTF("  Node %s unable read subversion.\n", pNode->second.getMacAsString()); 
                             setState(STOP);
                             return; 
                         }
@@ -883,7 +890,7 @@ bool Spidermesh::ProcessState(bool eob)
                             //TIMEOUT
                             if(!success) {
                                 pNode->second.otaStep = STEP_FAILED;
-                                PRTF("  Node %06X unable read database version.\n", pNode->first); 
+                                PRTF("  Node %s unable read database version.\n", pNode->second.getMacAsString()); 
                                 setState(STOP);
                                 return; 
                             }
@@ -906,7 +913,7 @@ bool Spidermesh::ProcessState(bool eob)
                             {
                                 if(!success) { //TIMEOUT
                                     pNode->second.otaStep = STEP_FAILED;
-                                    PRTF("  Node %06X unable read serie.\n", pNode->first); 
+                                    PRTF("  Node %s unable read serie.\n", pNode->second.getMacAsString()); 
                                     setState(STOP);
                                     return; 
                                 }
@@ -946,9 +953,9 @@ bool Spidermesh::ProcessState(bool eob)
                                 findNextNode(false,!isMode(READ_VERSION_SMK900));
 
                                 resetOtaTimeout();
-                                PRTF("  Node %06X have version ", pNode->first);
+                                PRTF("  Node %s have version ", pNode->second.getMacAsString());
 								char b[30];
-								sprintf(b,"version %06X", pNode->first);
+								sprintf(b,"version %s", pNode->second.getMacAsString());
 								logJson(b);
                                 PRTLN(pNode->second.old_firmware.getVersionString());
                             }));
@@ -956,7 +963,7 @@ bool Spidermesh::ProcessState(bool eob)
                     })); 
 				}));
 				ret = true;
-			}
+			}else findNextNode(false,true);
 		}
 	}
 	else if (isState(READ_PYBOARD_VERSION_NODES_INIT))
@@ -993,7 +1000,7 @@ bool Spidermesh::ProcessState(bool eob)
                     //TIMEOUT
                     if(!success) {
                         
-                        PRTF("  Node %06X unable read pyboard version.\n", pNode->first); 
+                        PRTF("  Node %s unable read pyboard version.\n", pNode->second.getMacAsString()); 
                         if(isMode(READ_VERSION_PYBOARD))
                         {
                             pNode->second.otaStep = STEP_REJECTED;
@@ -1044,7 +1051,7 @@ bool Spidermesh::ProcessState(bool eob)
                         pNode->second.otaStep = STEP_DONE;
                         firmware.current_progress++;
 						pNode->second.labelState = "OK";
-                        PRTF("  Node %06X pyboard version ", pNode->first);
+                        PRTF("  Node %s pyboard version ", pNode->second.getMacAsString());
 						
                         PRTLN(pNode->second.old_firmware.getVersionString());
                     }
@@ -1052,7 +1059,7 @@ bool Spidermesh::ProcessState(bool eob)
                     {
 						
 						PRT("  READ_PYBOARD_VERSION_NODES ");
-						PRTF("%06X", pNode->first);
+						PRTF("%s", pNode->second.getMacAsString());
 						PRTLN(" STEP_RETRY");
                         pNode->second.otaStep = STEP_RETRY;
 						pNode->second.labelState = "STEP_RETRY";
@@ -1062,7 +1069,7 @@ bool Spidermesh::ProcessState(bool eob)
                     {
 						
 						PRT("  READ_PYBOARD_VERSION_NODES ");
-						PRTF("%06X", pNode->first);
+						PRTF("%s", pNode->second.getMacAsString());
 						PRTLN(" STEP_REJECTED");
                         pNode->second.otaStep = STEP_REJECTED;
 						pNode->second.labelState = "REJECTED";
@@ -1094,11 +1101,12 @@ bool Spidermesh::ProcessState(bool eob)
                     }
 
                     if(doFindNext) findNextNode(false,!isMode(READ_VERSION_PYBOARD));
+				    resetOtaTimeout(); 
 
+				}));
 
-                    resetOtaTimeout(); }));
 				ret = true;
-			}
+			}else findNextNode(false,true);
 		}
 	}
 
@@ -1130,14 +1138,14 @@ bool Spidermesh::ProcessState(bool eob)
 
 				apiframe cmd = apiPacket(SMK_VM_FLASH, {0x00}, pCurrentNode->second.local); // start evm flash, will stop an active EVM as well if there is any
 
-				PRTF("  MAC to evm start %06X\n", pCurrentNode->second.mac.address);
+				PRTF("  MAC to evm start %s\n", pCurrentNode->second.getMacAsString());
 
 				WriteAndExpectAnwser(pCurrentNode, cmd, PACKET_VM_FLASH_RESP, "evmstart", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																						{
                     //TIMEOUT
                     if(!success) {
                         pNode->second.otaStep = STEP_FAILED;
-                        PRTF("  Node %06X unable to start evm.\n", pNode->first); 
+                        PRTF("  Node %s unable to start evm.\n", pNode->second.getMacAsString()); 
                         setState(STOP);
                         return; 
                     }
@@ -1152,7 +1160,7 @@ bool Spidermesh::ProcessState(bool eob)
                         setState(PRIME_NODE_TO_UPDATE_INIT);
                     }
                     resetOtaTimeout();
-                    PRTF("  Node %06X have been EVM started.\n", pNode->first); 
+                    PRTF("  Node %s have been EVM started.\n", pNode->second.getMacAsString()); 
 				}));
 
 				ret = true;
@@ -1179,7 +1187,7 @@ bool Spidermesh::ProcessState(bool eob)
 			if (currentNodeCanBePolled())
 			{
 				PRTLN("\n--> PRIME_NODE_TO_UPDATE");
-				logJson("PRIME_NODE_TO_UPDATE " + macIntToString(pCurrentNode->second.mac.address));
+				logJson("PRIME_NODE_TO_UPDATE " + pCurrentNode->second.getMacAsString());
 				pCurrentNode->second.otaStep = STEP_WAIT;
 
 				// apiframe cmd = apiPacket({0x0C, 0x00, 0x86}, pCurrentNode, {0x00, firmware.nbBlock.uint8b[0], firmware.nbBlock.uint8b[1]});
@@ -1190,14 +1198,14 @@ bool Spidermesh::ProcessState(bool eob)
 
 				apiframe cmd = apiPacket(SMK_UPDATE_OTA_CMD, {ota_subcommand, firmware.nbBlock.uint8b[0], firmware.nbBlock.uint8b[1]}, pCurrentNode->second.local);
 
-				PRTF("  MAC to prime %06X\n", pCurrentNode->second.mac.address);
+				PRTF("  MAC to prime %s\n", pCurrentNode->second.getMacAsString());
 
 				WriteAndExpectAnwser(pCurrentNode, cmd, SMK_UPDATE_OTA_CMD, "primenode", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																						{
                     //TIMEOUT
                     if(!success) {
                         pNode->second.otaStep = STEP_FAILED;
-                        PRTF("  Node %06X unable to prime it.\n", pNode->first); 
+                        PRTF("  Node %s unable to prime it.\n", pNode->second.getMacAsString()); 
                         setState(STOP);
                         return; 
                     }
@@ -1212,10 +1220,13 @@ bool Spidermesh::ProcessState(bool eob)
                         setState(BULKUPLOAD_INIT);
                     }
                     resetOtaTimeout();
-                    PRTF2("  Node %06X in ota mode. State: %d\n", pNode->first, pNode->second.otaStep); }));
-				ret = true;
-				findNextNode(false, true);
+                    PRTF2("  Node %s in ota mode. State: %d\n", pNode->second.getMacAsString(), pNode->second.otaStep); 
+				}));
+					findNextNode(false,true);
+					ret = true;
+				
 			}
+			else findNextNode(false, true);
 		}
 	}
 	else if (isState(BULKUPLOAD_INIT))
@@ -1281,7 +1292,7 @@ bool Spidermesh::ProcessState(bool eob)
 				float percent = firmware.current_block;
 				percent = percent / firmware.nbBlock.uint32b;
 				percent *= 100.0;
-				PRTF("bulk: perc: %4.1f: ", percent);
+				PRTF("bulk: %4.1f%: ", percent);
 				//PRTF("page: %3d - ", firmware.current_block);
 
 				apiframe cmd = apiPacket(SMK_UPDATE_OTA_CMD, pkt, pCurrentNode->second.local, true);
@@ -1342,7 +1353,7 @@ bool Spidermesh::ProcessState(bool eob)
 		if (currentNodeCanBePolled())
 		{
 			PRTLN("\n--> GETMISSINGFLAGS");
-			logJson("GETMISSINGFLAGS " + macIntToString(pCurrentNode->second.mac.address));
+			logJson("GETMISSINGFLAGS " + pCurrentNode->second.getMacAsString());
 			pCurrentNode->second.otaStep = STEP_WAIT;
 
 			// apiframe cmd = apiPacket({0x0C, 0x00, 0x86}, pCurrentNode, {0x07});
@@ -1352,7 +1363,7 @@ bool Spidermesh::ProcessState(bool eob)
 				ota_subcommand |= 0x80;
 			apiframe cmd = apiPacket(SMK_UPDATE_OTA_CMD, {ota_subcommand}, pCurrentNode->second.local);
 
-			PRTF("  MAC to get missing flags: %06X\n", pCurrentNode->first);
+			PRTF("  MAC to get missing flags: %a\n", pCurrentNode->second.getMacAsString());
 
 #if SIMULATION_GETMISSINGFLAGS
 			pCurrentNode->second.otaStep = STEP_DONE;
@@ -1384,7 +1395,7 @@ bool Spidermesh::ProcessState(bool eob)
                     //TIMEOUT
                     if(!success) {
                         pNode->second.otaStep = STEP_FAILED;
-                        PRTF("  Node %06X unable to get missing\n", pNode->first); 
+                        PRTF("  Node %s unable to get missing\n", pNode->second.getMacAsString()); 
                         return; 
                     }
 
@@ -1434,6 +1445,7 @@ bool Spidermesh::ProcessState(bool eob)
                     {
                         pNode->second.otaStep = STEP_DONE;
                         firmware.current_progress++;
+						PRTF("  Node %s have no missing flag\n", pNode->second.getMacAsString()); 
                         findNextNode(false, true);
                     }
                     
@@ -1444,11 +1456,12 @@ bool Spidermesh::ProcessState(bool eob)
                         setState(PRUNE_VALID_PAGES_INIT);
                     }
                     resetOtaTimeout();
-                    PRTF(" Node %06X have no missing flag\n", pNode->first); }));
+                    
+				}));
 
 #endif
 			ret = true;
-		}
+		}else findNextNode(false,true);
 	}
 	else if (isState(SEND_MISSING_PAGE_INIT))
 	{
@@ -1480,7 +1493,7 @@ bool Spidermesh::ProcessState(bool eob)
 		if (eob)
 		{
 			PRT("\n--> SEND_MISSING_PAGE\n");
-			logJson("SEND_MISSING_PAGE for " + macIntToString(pCurrentNode->second.mac.address));
+			logJson("SEND_MISSING_PAGE for " +pCurrentNode->second.getMacAsString());
 
 			apiframe payload;
 
@@ -1671,7 +1684,7 @@ bool Spidermesh::ProcessState(bool eob)
 		{
 			if (currentNodeCanBePolled())
 			{
-				PRTF("\n--> CHECK_IF_CRC_OK of node %06X\n", pCurrentNode->first);
+				PRTF("\n--> CHECK_IF_CRC_OK of node %s\n", pCurrentNode->second.getMacAsString());
 				pCurrentNode->second.otaStep = STEP_WAIT;
 
 				// apiframe cmd = apiPacket({0x0C, 0x00, 0x86}, pCurrentNode, {0x13});
@@ -1692,8 +1705,8 @@ bool Spidermesh::ProcessState(bool eob)
                         //TIMEOUT
                         if(!success) {
                             pNode->second.otaStep = STEP_FAILED;
-                            PRTF(" Node %06X unable to check CRC\n",pNode->first);
-							logJson("CHECK_IF_CRC timeout"  + macIntToString(pCurrentNode->second.mac.address));
+                            PRTF(" Node %s unable to check CRC\n",pNode->second.getMacAsString());
+							logJson("CHECK_IF_CRC timeout"  + pCurrentNode->second.getMacAsString());
                             setState(STOP);
                             return; 
                         }
@@ -1706,7 +1719,7 @@ bool Spidermesh::ProcessState(bool eob)
 						}
                         pNode->second.otaStep = STEP_DONE;
 
-						logJson("CRC" + macIntToString(pCurrentNode->second.mac.address) + " " + hexPacketToAscii(packet));
+						logJson("CRC" + pCurrentNode->second.getMacAsString() + " " + hexPacketToAscii(packet));
 						
                         if(nodes.isStepComplete()){
 							if(firmware.isVmMachine())
@@ -1714,14 +1727,16 @@ bool Spidermesh::ProcessState(bool eob)
 							else
 								setState(SEND_META_DATA_INIT);
 						} 
-                        PRTF(" Node %06X have valid CRC\n", pNode->first);
+                        PRTF(" Node %s have valid CRC\n", pNode->second.getMacAsString());
                         resetOtaTimeout();
                         firmware.current_progress++; }));
+						findNextNode(false,true);
 
 #endif
-				findNextNode(false, true);
+				
 				ret = true;
 			}
+			else findNextNode(false, true);
 		}
 	}
 	else if (isState(SEND_META_DATA_INIT))
@@ -1745,7 +1760,7 @@ bool Spidermesh::ProcessState(bool eob)
 		{
 			if (currentNodeCanBePolled())
 			{
-				PRTF("\n--> SEND_META_DATA to: %06X\n", pCurrentNode->first);
+				PRTF("\n--> SEND_META_DATA to: %s\n", pCurrentNode->second.getMacAsString());
 				pCurrentNode->second.otaStep = STEP_WAIT;
 
 				u_bytes a;
@@ -1781,7 +1796,7 @@ bool Spidermesh::ProcessState(bool eob)
                         //TIMEOUT
                         if(!success) {
                             pNode->second.otaStep = STEP_FAILED;
-                            PRTF(" Node %06X unable to send meta data\n", pNode->first); 
+                            PRTF(" Node %s unable to send meta data\n", pNode->second.getMacAsString()); 
                             pNode->second.labelState = "ERROR: META DATA";
                             return; 
                         }
@@ -1792,17 +1807,18 @@ bool Spidermesh::ProcessState(bool eob)
                         pNode->second.offset_chunk++;
                         if(pNode->second.offset_chunk == NB_WRITE_META_DATA)
                         {
-							logJson("succes for " + macIntToString(pCurrentNode->second.mac.address));
+							logJson("succes for " + pCurrentNode->second.getMacAsString());
                             pNode->second.otaStep = STEP_DONE;
                             //pNode->second.labelState = "META DATA RECEIVED";
                         }
                         else pNode->second.otaStep = STEP_INIT; //to retriger sending next chunck
                         if(nodes.isStepComplete()) setState(RESET_NODE_ON_SEEK_INIT);
-                        PRTF(" Node %06X have received metadata\n", pNode->first); }));
+                        PRTF(" Node %s have received metadata\n", pNode->second.getMacAsString()); }));
 #endif
-				findNextNode(false,true);
+						findNextNode(false,true);
 				ret = true;
 			}
+			else findNextNode(false,true);
 		}
 	}
 	else if (isState(RESET_NODE_ON_SEEK_INIT))
@@ -1826,7 +1842,7 @@ bool Spidermesh::ProcessState(bool eob)
 			return false;
 		if (currentNodeCanBePolled())
 		{
-			PRTF("\n--> RESET_NODE_ON_SEEK: %06X\n", pCurrentNode->first);
+			PRTF("\n--> RESET_NODE_ON_SEEK: %s\n", pCurrentNode->second.getMacAsString());
 			pCurrentNode->second.otaStep = STEP_WAIT;
 
 			// apiframe cmd = apiPacket({0x0C, 0x00, 0x84}, pCurrentNode, {0x00, 0x81, 0x04, 0xBB, 0xE2, 0x26, 0x38});
@@ -1850,7 +1866,7 @@ bool Spidermesh::ProcessState(bool eob)
 					if (!success)
 					{
 						pNode->second.otaStep = STEP_FAILED;
-						PRTF(" Node %06X unable unlock reg 0xA1\n", pNode->first);
+						PRTF(" Node %s unable unlock reg 0xA1\n", pNode->second.getMacAsString());
 						setState(STOP);
 						return;
 					}
@@ -1865,7 +1881,7 @@ bool Spidermesh::ProcessState(bool eob)
 							//TIMEOUT
 							if(!success) {
 								pNode->second.otaStep = STEP_FAILED;
-								PRTF(" Node %06X unable apply reset on seek\n", pNode->first); 
+								PRTF(" Node %s unable apply reset on seek\n", pNode->second.getMacAsString()); 
 								logJson("failed");
 								setState(STOP);
 								return; 
@@ -1873,10 +1889,9 @@ bool Spidermesh::ProcessState(bool eob)
 						
 							//SUCESS
 							pNode->second.otaStep = STEP_DONE;
-							findNextNode(false,true);
 							doProcessState = true;
 							firmware.current_progress++;
-							logJson("RESET_NODE_ON_SEEK_INIT" + macIntToString(pCurrentNode->second.mac.address) + " " + hexPacketToAscii(packet));
+							logJson("RESET_NODE_ON_SEEK_INIT" + pCurrentNode->second.getMacAsString() + " " + hexPacketToAscii(packet));
 							
 							if(nodes.isStepComplete()) 
 							{
@@ -1886,8 +1901,10 @@ bool Spidermesh::ProcessState(bool eob)
 							else
 								setState(SEND_MAGICWORD_INIT);
 							}
-							PRTF(" Node %06X have received reset on seek command\n", pNode->first); 
-						})); }));
+							PRTF(" Node %s have received reset on seek command\n", pNode->second.getMacAsString()); 
+							findNextNode(false,true);
+					})); 
+			}));
 #endif
 			ret = true;
 #if SIMULATION_RESET_NODE_ON_SEEK
@@ -1895,7 +1912,7 @@ bool Spidermesh::ProcessState(bool eob)
 #else
 			doProcessState = false;
 #endif
-		}
+		}else findNextNode(false,true);
 	}
 	else if (isState(SEND_MAGICWORD_INIT))
 	{
@@ -1919,7 +1936,7 @@ bool Spidermesh::ProcessState(bool eob)
 			{
 				PRT("\n--> SEND_MAGICWORD to :");
 				PRTLN(pCurrentNode->second.getMacAsString());
-				logJson("SEND_MAGICWORD " + macIntToString(pCurrentNode->second.mac.address));
+				logJson("SEND_MAGICWORD " + pCurrentNode->second.getMacAsString());
 
 				pCurrentNode->second.otaStep = STEP_WAIT;
 
@@ -1949,14 +1966,14 @@ bool Spidermesh::ProcessState(bool eob)
                         //TIMEOUT
                         if(!success) {
                             pNode->second.otaStep = STEP_REJECTED;
-                            PRTF("  Node %06X unable to write magic word\n", macIntToString(pNode->first)); 
+                            PRTF("  Node %s unable to write magic word\n", pNode->second.getMacAsString()); 
 							logJson("Timeout" + macIntToString(pNode->first));
                             setState(STOP);
                             return; 
                         }
                     
                         //SUCESS
-						int packet_idx_to_check =(pCurrentNode->second.local)?9:15;
+						int packet_idx_to_check =(pNode->second.local)?9:15;
                         if(packet[packet_idx_to_check]==0x01)
                         { 
                             pNode->second.otaStep = STEP_DONE;
@@ -1991,11 +2008,12 @@ bool Spidermesh::ProcessState(bool eob)
 								setState(RESET_GATEWAY_TO_APPLY_UPDATE);
 							}
                         }
-                        PRTF("  Node %06X have received magic word\n", pNode->first); }));
+                        PRTF("  Node %s have received magic word\n", pNode->second.getMacAsString()); 
+						findNextNode(false,true);
+				}));
 #endif
-				findNextNode(false,true);
 				ret = true;
-			}
+			}else findNextNode(false, true);
 		}
 	}
 	else if (isState(FORCE_EVM_TRIPPLET))
@@ -2016,7 +2034,7 @@ bool Spidermesh::ProcessState(bool eob)
 		{
 			if (currentNodeCanBePolled())
 			{
-				PRTF("\n--> FORCE_EVM_TRIPPLET to : %06X\n", pCurrentNode->second.mac.address);
+				PRTF("\n--> FORCE_EVM_TRIPPLET to : %s\n", pCurrentNode->second.getMacAsString());
 
 				pCurrentNode->second.otaStep = STEP_WAIT;
 
@@ -2040,7 +2058,7 @@ bool Spidermesh::ProcessState(bool eob)
                         //TIMEOUT
                         if(!success) {
                             pNode->second.otaStep = STEP_FAILED;
-                            PRTF("  Node %06X unable to force tripplet\n",pNode->first); 
+                            PRTF("  Node %s unable to force tripplet\n",pNode->second.getMacAsString()); 
                             setState(STOP);
                             return; 
                         }
@@ -2058,11 +2076,13 @@ bool Spidermesh::ProcessState(bool eob)
 							else
 								setState(STOP);
                         }
-                        PRTF("  Node %06X force tripplet success\n", pNode->first); }));
+                        PRTF("  Node %s force tripplet success\n", pNode->second.getMacAsString()); 
+						findNextNode(false,true);
+				}));
 #endif
-				findNextNode(false,true);
+				
 				ret = true;
-			}
+			}else findNextNode(false,true);
 		}
 	}
 	else if (isState(RESET_GATEWAY_TO_APPLY_UPDATE))
@@ -2172,7 +2192,7 @@ bool Spidermesh::ProcessState(bool eob)
 	{
 #if SIMULATION_RESET_FACTORY_PYBOARD
 		PRT("\n--> RESET_FACTORY_PYBOARD of: ");
-		PRTF("%06X \n", pCurrentNode->second.mac.address);
+		PRTF("%s \n", pCurrentNode->second.getMacAsString());
 		apiframe cmd = apiPacket({0x0C, 0x00, 0x8E}, pCurrentNode, {0x03});
 		pCurrentNode->second.otaStep = STEP_DONE;
 		findNextNode();
@@ -2184,8 +2204,8 @@ bool Spidermesh::ProcessState(bool eob)
 		{
 			if (currentNodeCanBePolled())
 			{
-				PRTF("\n--> RESET_FACTORY_PYBOARD: %06X\n", pCurrentNode->first);
-				logJson("Reset fatory of "  + macIntToString(pCurrentNode->second.mac.address));
+				PRTF("\n--> RESET_FACTORY_PYBOARD: %s\n", pCurrentNode->second.getMacAsString());
+				logJson("Reset fatory of "  + pCurrentNode->second.getMacAsString());
 				pCurrentNode->second.otaStep = STEP_WAIT;
 
 				// apiframe cmd = apiPacket({0x0C, 0x00, 0x8E}, pCurrentNode, {0x03});
@@ -2196,15 +2216,15 @@ bool Spidermesh::ProcessState(bool eob)
                     //TIMEOUT
                     if(!success) {
                         pNode->second.otaStep = STEP_FAILED;
-                        PRTF(" Node %06X unable apply factory reset.\n", pNode->first); 
+                        PRTF(" Node %s unable apply factory reset.\n", pNode->second.getMacAsString()); 
 						
 
 						if(pNode->second.nbFailed++ >10)
 						{
 							pNode->second.otaStep = STEP_DONE;
-							logJson("assume reset factory is done "  + macIntToString(pCurrentNode->second.mac.address));
+							logJson("assume reset factory is done "  + pCurrentNode->second.getMacAsString());
 						}
-						else logJson("unable to confirm reset fatory of "  + macIntToString(pCurrentNode->second.mac.address));
+						else logJson("unable to confirm reset fatory of "  + pCurrentNode->second.getMacAsString());
                         return; 
                     }
                 
@@ -2218,11 +2238,13 @@ bool Spidermesh::ProcessState(bool eob)
 					}
                     doProcessState = true;
                     resetOtaTimeout();
-                    PRTF(" Node %06X have been reset to factory state\n", pNode->first); }));
+                    PRTF(" Node %s have been reset to factory state\n", pNode->second.getMacAsString()); 
+					findNextNode(false,true);
+				}));
 				ret = true;
 
-				findNextNode(false,true);
-			}
+				
+			}else findNextNode(false, true);
 		}
 #endif
 	}
@@ -2246,7 +2268,7 @@ bool Spidermesh::ProcessState(bool eob)
 // PRTLN("\n--> PRIME_NODE_TO_UPDATE");
 #if SIMULATION_PYBOARD_CHECK_PROGRESS
 		PRT("\n--> PYBOARD_CHECK_PROGRESS of: ");
-		PRTF("%06X \n", pCurrentNode->second.mac.address);
+		PRTF("%s \n", pCurrentNode->second.getMacAsString());
 		apiframe cmd = apiPacket({0x0C, 0x00, 0x8E}, pCurrentNode, {0x07});
 		pCurrentNode->second.otaStep = STEP_DONE;
 		findNextNode(false,true);
@@ -2283,7 +2305,7 @@ bool Spidermesh::ProcessState(bool eob)
 						//portENTER_CRITICAL(&mmux);	
                         pNode->second.otaStep = STEP_WAIT;
 						//portEXIT_CRITICAL(&mmux);
-                        PRTF(" Node %06X unable get transfert to pyboard progress\n", pNode->first);
+                        PRTF(" Node %s unable get transfert to pyboard progress\n", pNode->second.getMacAsString());
                         return; 
                     }
                 
@@ -2315,7 +2337,7 @@ bool Spidermesh::ProcessState(bool eob)
 
 						if(c >= t){
 							pNode->second.otaStep = STEP_DONE;
-							PRTF("  success node: %06X\n", pNode->first);
+							PRTF("  success node: %s\n", pNode->second.getMacAsString());
 						}
 
 						if(nodes.isStepComplete())
