@@ -550,8 +550,10 @@ bool Spidermesh::ProcessState(bool eob)
 
 								nodes.pool.clear(); 
 								nodes.loadParamFiles();
+								nodes.loadNodes();
 								nodes.add(a, "gateway", LOCAL, "main", "main gateway");
 								gateway=nodes.pool.begin();
+								nodes.loadType(getTypeJsonVariant());
 
 								PRT("GATEWAY mac is: ");
 								PRTLN(smac);

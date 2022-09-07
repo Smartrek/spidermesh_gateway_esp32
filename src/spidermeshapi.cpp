@@ -103,6 +103,11 @@ SpidermeshApi::SpidermeshApi()
 
 }
 
+JsonVariant SpidermeshApi::getTypeJsonVariant()
+{
+    return type_json.as<JsonVariant>();
+}
+
 bool SpidermeshApi::addNewNode(JsonVariant pSource)
 {
     bool ret = true;

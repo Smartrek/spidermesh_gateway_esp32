@@ -190,6 +190,9 @@ public:
 	static bool show_apipkt_in;
 	static bool show_apipkt_out;
 
+
+	static JsonVariant getTypeJsonVariant();
+
 	static void setWhenPacketReceived(std::function<void(apiframe)> fn) { cbWhenPacketReceived = fn; };
 	static void setCallbackAutomaticPolling(ExpectCallback fn){cbAutomaticPolling = fn;};
 	static void setCallbackAutoRequestBuilder(std::function<apiframe(mesh_t::iterator)> fn ){cbAutoRequestBuilder=fn;}

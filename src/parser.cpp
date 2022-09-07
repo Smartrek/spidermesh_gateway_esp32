@@ -8,10 +8,13 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 
   #if SHOW_DEBUG_EXTRACT_DATA
 	Serial.println("\r\n-- Extraction parameter from json definition --");
-	Serial.printf("  --> Packet ID: %d<--\r\n",packet_id);
 	Serial.print ("  --> tag: ");
 	Serial.println (tag);
+
+	if(!type_json.containsKey(type)) Serial.printf("Node type:%s not available\n", type);
   #endif
+
+
 
 
 	if(type_json[type]["parser"].containsKey(tag))
