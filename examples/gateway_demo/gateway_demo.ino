@@ -140,7 +140,7 @@ bool update_once = false;
 void loop()
 {
 	#ifdef TEST_OTA_UPDATE
-	#define TEST_LOCAL
+	//#define TEST_LOCAL
 	#define TEST_REMOTE
 
 	if(smk900.isMode(READY) && smk900.isState(IDLE) && !update_once)

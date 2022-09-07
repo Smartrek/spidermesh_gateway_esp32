@@ -1,39 +1,6 @@
 #include "Spidermesh.h"
 #include <spidermeshapi.h>
 
-#define SKIP_NODE_WHEN_MISSING_PAGE_OLD_VERSION false
-#define FORCE_UNICAST_SENDING_MISSING_FLAG true
-
-#define SIM_MISSING_PACKET_SCRATCH false
-#define SIM_MISSING_PACKET_SCRATCH_BIT (0x0002)
-#define NB_RETRY_SAME_SCRATCH_LOST 3
-
-#define SKIP_BULKUPLOAD false
-#define SIM_SKIP_SOME_BROADCAST_UPLOAD false
-#define SIM_SKIP_SOME_BROADCAST_UPLOAD_EVERY 200
-
-#define SIMULATION NO_SIMULATION
-//#define SIMULATION FULL_SIMULATION
-//#define SIMULATION SIMULATION_END
-
-//#ifdef SIMULATION == NO_SIMULATION
-
-#define SIMULATION_BULKUPLOAD false
-#define SIMULATION_GETMISSINGFLAGS false
-#define SIMULATION_MISSINGFLAGS_ERROR false
-#define SIMULATION_PRUNE_VALID_PAGES false
-#define SIMULATION_CHECK_IF_CRC_OK false
-#define SIMULATION_SEND_META_DATA false
-#define SIMULATION_RESET_NODE_ON_SEEK false
-#define SIMULATION_SEND_MAGICWORD false
-
-#define SIMULATION_ABORT_UPDATE false
-#define SIMULATION_SLOW_DYN_FOR_SIM_BUTTON false
-#define SIMULATION_RESET_FACTORY_PYBOARD false
-#define SIMULATION_PYBOARD_CHECK_PROGRESS false
-
-
-#define EXPECTED_PRESET_RF_AT_BOOT PRESET_20B
 
 
 bool Spidermesh::doProcessState;
@@ -59,6 +26,10 @@ MeshParam Spidermesh::requiredMeshSpeed;
 
 hw_timer_t* Spidermesh::watchdogPortia;
 bool Spidermesh::interruptResetPortiaFlag=false;
+
+#if SIM_SKIP_SOME_BROADCAST_UPLOAD
+int Spidermesh::sim_skip_first_packet;
+#endif
 
 
 void Spidermesh::begin(int hop, int duty, int rf_speed)
