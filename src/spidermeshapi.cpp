@@ -922,7 +922,7 @@ void SpidermeshApi::automaticNodePolling()
   #endif
 
     //if there are nodes to poll
-    if(nodes.pool.size() > 0)
+    if(nodes.pool.size() > 1) //we check if more than one since gateway is the first
     {
         apiframe smkPacket;
         //bool must_increase_polling_iterator = false;

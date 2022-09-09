@@ -31,6 +31,8 @@ bool Spidermesh::interruptResetPortiaFlag=false;
 int Spidermesh::sim_skip_first_packet;
 #endif
 
+std::function<void()> Spidermesh::cbLoadExternalParamFiles;
+
 
 void Spidermesh::begin(int hop, int duty, int rf_speed)
 {
@@ -520,11 +522,16 @@ bool Spidermesh::ProcessState(bool eob)
 								//loadList();
 
 								nodes.pool.clear(); 
-								nodes.loadParamFiles();
-								nodes.loadNodes();
 								nodes.add(a, "gateway", LOCAL, "main", "main gateway");
 								gateway=nodes.pool.begin();
-								nodes.loadType(getTypeJsonVariant());
+								if(cbLoadExternalParamFiles) cbLoadExternalParamFiles();
+								else{
+									nodes.loadNodes();	
+									nodes.loadType(getTypeJsonVariant());
+								} 
+								//nodes.loadParamFiles();
+								//nodes.loadNodes();
+								//nodes.loadType(getTypeJsonVariant());
 
 								PRT("GATEWAY mac is: ");
 								PRTLN(smac);

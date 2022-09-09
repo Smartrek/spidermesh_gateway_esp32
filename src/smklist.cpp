@@ -10,7 +10,6 @@ SmkList::SmkList(String flist, JsonVariant type_json_main_file)
     conversion_type.insert(std::pair<String,int>("int", 0));
     conversion_type.insert(std::pair<String,int>("float", 3));   
     jsonType = type_json_main_file;
-    loadParamFiles(); 
 }
 
 //------------------------------------------------------------------------------------------------------------

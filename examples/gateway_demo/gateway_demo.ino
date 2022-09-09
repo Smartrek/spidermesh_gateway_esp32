@@ -34,6 +34,7 @@
 //#define TEST_UNICAST_TO_NODE
 //#define TEST_BROADCAST_TO_ALL_NODE
 //#define TEST_OTA_UPDATE
+#define TEST_LOAD_EXTERNAL_FILES_DEFINITION
 
 
 Spidermesh smk900;
@@ -57,7 +58,8 @@ void CallbackAutoPolling(mesh_t::iterator pNode, apiframe packet, bool success, 
 	//payload contain nothing if unable to reach node
 	if(!success) 
 	{
-		Serial.println("Timeout: Unable to reach node");
+		Serial.print("Timeout: Unable to reach node: ");
+		Serial.println(pNode->second.getMacAsString());
 		return; //we quit here
 	}
 	//to know who trigger the callback	and what is his type	
@@ -89,6 +91,13 @@ apiframe CallbackAutoRequestBuilder(mesh_t::iterator pNode)
 	//it will be send immediately after this call
 	apiframe request_packet={0x60};
 	return request_packet;
+}
+
+void CallbackLoadExternalFileDefinition()
+{
+	String mac_gateway = smk900.gateway->second.getMacAsString();
+	Serial.print("Load list of gateway: ");
+	Serial.println(mac_gateway);
 }
 
 
@@ -123,6 +132,11 @@ void setup()
 	#if !defined(TEST_OTA_UPDATE) && defined(TEST_AUTOMATIC_NODE_POLLING)
 	smk900.enableAutomaticPolling();
 	#endif
+
+	#ifdef TEST_LOAD_EXTERNAL_FILES_DEFINITION
+	smk900.setCallbackLoadExternalParamFiles(CallbackLoadExternalFileDefinition);
+	#endif
+
 
 	//to check or not all transaction with smk900 module
 	smk900.setApiMsgFlag(true,true,false); 

@@ -268,7 +268,11 @@ public:
 
 private:
 	TaskHandle_t Task1;
-	static void smkGatewayTaskCore(void *pvParameters);    
+	static void smkGatewayTaskCore(void *pvParameters);
+
+	static std::function<void()> cbLoadExternalParamFiles;
+public:
+	static void setCallbackLoadExternalParamFiles(std::function<void()> fn){cbLoadExternalParamFiles=fn;};
 };
 
 
