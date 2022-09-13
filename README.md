@@ -17,26 +17,28 @@ In the loop function or inside callback function, if you want to make custom api
 
 ## Definition of the lib and variables
 
-	#include <Spidermesh.h>
-	Spidermesh smk900;
+```c++
+#include <Spidermesh.h>
+Spidermesh smk900;
+```
 
 ## Basic functions
-
 ### begin
-
-You can define the speed of the Spidermesh network with this function. 
-
-	int nb_hops = 8;
-	int duty_cycle = 5;
-	int nb_byte_per_packet = 20;
-	smk900.begin(nb_hops,duty_cycle,nb_byte_per_packet);
-
+You can define the speed of the Spidermesh network with this function. For more detail about paramters of Spidermesh, see https://www.smartrek.io/download/SMK900_Portia_Summary_V6.pdf
+```c++
+int nb_hops = 8;
+int duty_cycle = 5;
+int nb_byte_per_packet = 20;
+smk900.begin(nb_hops,duty_cycle,nb_byte_per_packet);
+```
 
 ### enableAutomaticPolling
 
 When smk900.cbAutomaticPolling have been define, call this function to enable the automatic polling of node define in nodes.json
 
-	smk900.enableAutomaticPolling();
+```c++
+smk900.enableAutomaticPolling();
+```
 
 ## Callback functions
 
@@ -52,7 +54,6 @@ smk900.enableAutomaticPolling();
 Callback function use for the automatic polling of all nodes define in nodes.json.  For parameters of this function, there is the node pointer to know who trigger the function, the packet received, if the response have been succesfully received or if the timeout have been triggered. It is possible as well to parse the raw data here if node type have been define. Automatic polling must be enable.
 
 ```c++
-
 void CallbackAutoPolling(mesh_t::iterator pNode, apiframe packet, bool success, String tag)
 {
 	//in case was unable to reach node, action can be done here
