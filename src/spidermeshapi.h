@@ -220,7 +220,6 @@ public:
 	static bool isGatewayMacIsReceived() { return gatewayMacAddressIsReceived; };
 	static bool isGatewayMacAvailable() { return gatewayMacAddressIsReceived; };
 	static void SaveGatewayMacAddress(apiframe packet);
-	static void loadList();
 	static String getMacGateway()
 	{
 		String ret = "";
@@ -287,7 +286,6 @@ public:
 	{
 		return nodes.pool.size();
 	};
-	bool addNewNode(JsonVariant pSource);
 	String getAvailabilityNodes();
 
 	static void task();

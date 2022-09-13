@@ -36,7 +36,7 @@
 #define SHOW_DEBUG_EXTRACT_DATA false
 #define SHOW_DEBUG_DICTIONARY false
 #define SHOW_DEBUG_DRIVE false
-#define SHOW_LOAD_NODE_DEBUG false
+#define SHOW_LOAD_NODE_DEBUG true
 
 #define RTC_ENABLED 0
 #define SD_CARD_ENABLED 0

@@ -20,7 +20,6 @@ void appendFile(fs::FS &fs, const char * path, const char * message);
 void writeFile(fs::FS &fs, const char * path, const char * message);
 
 String readNodeListFile();
-bool writeNodeListToFile();
 
 
 String readNodeTypeFile();

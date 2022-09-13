@@ -519,19 +519,13 @@ bool Spidermesh::ProcessState(bool eob)
 
 							if(!initDone)
 							{
-								//loadList();
-
 								nodes.pool.clear(); 
 								nodes.add(a, "gateway", LOCAL, "main", "main gateway");
 								gateway=nodes.pool.begin();
 								if(cbLoadExternalParamFiles) cbLoadExternalParamFiles();
 								else{
-									nodes.loadNodes();	
-									nodes.loadType(getTypeJsonVariant());
+									nodes.loadParamFiles();
 								} 
-								//nodes.loadParamFiles();
-								//nodes.loadNodes();
-								//nodes.loadType(getTypeJsonVariant());
 
 								PRT("GATEWAY mac is: ");
 								PRTLN(smac);

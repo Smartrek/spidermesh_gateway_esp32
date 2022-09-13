@@ -1,6 +1,5 @@
 #include <parser.h>
 
-extern DynamicJsonDocument type_json;
 
 bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payload, String &type)
 {
@@ -15,9 +14,7 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
   #endif
 
 
-
-
-	if(type_json[type]["parser"].containsKey(tag))
+	if(SmkList::type_json[type]["parser"].containsKey(tag))
 	{
 		#if SHOW_DEBUG_EXTRACT_DATA
 		Serial.print("  default status key is founded");
@@ -36,7 +33,7 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 	}
 
 
-	JsonObject extract_parameters = type_json[type]["parser"][tag]["params"].as<JsonObject>();
+	JsonObject extract_parameters = SmkList::type_json[type]["parser"][tag]["params"].as<JsonObject>();
 
 	payload["time"]="millis() " + String(millis()); //getTimeFormated();
 

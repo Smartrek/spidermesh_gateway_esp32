@@ -34,7 +34,7 @@
 //#define TEST_UNICAST_TO_NODE
 //#define TEST_BROADCAST_TO_ALL_NODE
 //#define TEST_OTA_UPDATE
-#define TEST_LOAD_EXTERNAL_FILES_DEFINITION
+//#define TEST_LOAD_EXTERNAL_FILES_DEFINITION
 
 
 Spidermesh smk900;
@@ -83,6 +83,7 @@ void CallbackAutoPolling(mesh_t::iterator pNode, apiframe packet, bool success, 
 	}
 }
 
+#ifdef TEST_REQUEST_BUILDER
 //Before every automatic polling request of nodes, RF payload can be customized with this function.
 //if the function is not defined or if it return nothing, default status command will be sent
 apiframe CallbackAutoRequestBuilder(mesh_t::iterator pNode)
@@ -92,14 +93,31 @@ apiframe CallbackAutoRequestBuilder(mesh_t::iterator pNode)
 	apiframe request_packet={0x60};
 	return request_packet;
 }
+#endif
 
+#ifdef TEST_LOAD_EXTERNAL_FILES_DEFINITION
+// At the end of the initialisation of the smk900.begin, initialisation files can be fetch 
+// from external source, instead of SPIFFS 
+// If the following callback is define and set with smk900.setCallbackLoadExternalParamFiles
+// the SPIFFS is avoided.
+//
 void CallbackLoadExternalFileDefinition()
 {
 	String mac_gateway = smk900.gateway->second.getMacAsString();
 	Serial.print("Load list of gateway: ");
 	Serial.println(mac_gateway);
-}
 
+	//--------------------------------------------------------
+	//example of loading nodes list available and the types
+	//smk900.nodes.loadNodes("{\"0.0.172.51\":{\"name\":\"Office1\",\"type\":\"vacuum\"},\"0.0.172.52\":{\"name\":\"Office2\",\"type\":\"vacuum\"},\"0.0.64.62\":{\"name\":\"Office3\",\"type\":\"vacuum\"}}");
+
+	//loading of all the type available
+	//smk900.nodes.loadTypes("{\"vacuum\":{\"parser\":{\"status\":{\"params\":{\"rssi\":{\"pos\":[0,8]},\"vacuum\":{\"pos\":[8,16]},\"temperature\":{\"pos\":[24,8]},\"volt\":{\"pos\":[32,8]}}}}}}");
+
+	//loading of one type at the time
+	//smk900.nodes.loadType("vacuum", "{\"parser\":{\"status\":{\"params\":{\"rssi\":{\"pos\":[0,8]},\"vacuum\":{\"pos\":[8,16]},\"temperature\":{\"pos\":[24,8]},\"volt\":{\"pos\":[32,8]}}}}}");
+}
+#endif
 
 void setup()
 {

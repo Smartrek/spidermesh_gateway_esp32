@@ -2,25 +2,14 @@
 #include "esp32-hal-uart.h"
 #include "soc/uart_struct.h"
 
-/*
-#ifdef SIMULATION == SIMULATION_END
-    #define SIMULATION_BULKUPLOAD               false
-    #define SIMULATION_GETMISSINGFLAGS          false
-    #define SIMULATION_PRUNE_VALID_PAGES    false
-    #define SIMULATION_CHECK_IF_CRC_OK          false
-    #define SIMULATION_SEND_META_DATA           false
-    #define SIMULATION_RESET_NODE_ON_SEEK       true
-    #define SIMULATION_SEND_MAGICWORD           true
 
-#endif
-*/
 #ifdef PORTIA_KLIK_THREADSAFING_ENABLED
     #define PORTIA_SYNCHRONIZE() std::unique_lock<std::recursive_mutex> lock(mPortiaMutex)
 #else
     #define PORTIA_SYNCHRONIZE() do{}while(0)
 #endif
 
-DynamicJsonDocument type_json(SIZE_OF_DYNAMIC_JSON_FILE);
+
 
 
 mesh_t::iterator SpidermeshApi::gateway;
@@ -101,63 +90,6 @@ SpidermeshApi::SpidermeshApi()
     cbWhenPacketReceived = [](apiframe){};
 
 
-}
-
-JsonVariant SpidermeshApi::getTypeJsonVariant()
-{
-    return type_json.as<JsonVariant>();
-}
-
-bool SpidermeshApi::addNewNode(JsonVariant pSource)
-{
-    bool ret = true;
-    JsonObject pay_json = pSource.as<JsonObject>();
-    for(auto n:pay_json)
-    {
-        String mac = n.key().c_str();
-        if (!isValidMac(mac))
-        {
-            Serial.println("ERROR - packet do not contain a valid 'mac' key");
-            break;
-        }
-        JsonObject i_node = n.value().as<JsonObject>();
-
-        String type;
-        if(!i_node.containsKey("type"))
-        {
-            Serial.println("ERROR - packet do not contain a type");
-            break;
-        }
-
-        //TODO: validate type available
-
-        type = i_node["type"].as<String>();
-
-        String group="no_group";
-        if(i_node.containsKey("group")) group = i_node["group"].as<String>();
-        if(i_node.containsKey("trail")) group = i_node["trail"].as<String>();
-        
-        String name = "no_name";
-        if(i_node.containsKey("name")) name = i_node["name"].as<String>();
-
-        uint16_t srate = (i_node.containsKey("srate")) ? i_node["srate"].as<uint16_t>():0; 
-        bool enabled = (i_node.containsKey("enabled")) ? i_node["enabled"].as<bool>():true; 
-        bool local = (i_node.containsKey("local")) ? i_node["local"].as<bool>():false; 
-
-        //add node to the database
-        uint32_t mac_int;
-        macStringToInt(mac,&mac_int);
-        if(!nodes.add(mac_int, group, REMOTE, name, type, enabled, srate)) ret = false;
-        
-    }
-    
-    if(!nodes.writeNodeListToFile()) return false;
-    nodes.loadNodes();//to redo the code indexing and init of variables
-    listOfExpectedAnswer.clear();
-    findNext(true,true);
-    
-
-    return ret;
 }
 
 bool SpidermeshApi::init()
@@ -255,19 +187,6 @@ void SpidermeshApi::SaveGatewayMacAddress(apiframe packet)
     gatewayMacAddressIsReceived=true;
 }
 
-void SpidermeshApi::loadList()
-{
-    JsonVariant type_json_main_file = type_json.as<JsonVariant>();
-    
-
-    nodes = SmkList("/nodes.json", type_json_main_file);
-	type_json.shrinkToFit();
-
-
-	Serial.print("Size type_json is: ");
-	Serial.println(type_json.memoryUsage());    
-
-}
 
 apiframe SpidermeshApi::localSetRegister(uint8_t offset_register, uint8_t size_register, uint8_t *content)
 {
@@ -1009,7 +928,7 @@ void SpidermeshApi::automaticNodePolling()
         if(pPoll != nodes.pool.end())
         {
             #if SHOW_AUTOMATIC_POLLING
-                Serial.println("DEBUG!!!!!!!!!!!!!!!!!!!");
+                Serial.println("SHOW_AUTOMATIC_POLLING");
                 delay(100);
                 Serial.println(pPoll->second.getMacAsString());
                 //Serial.printf ("Automatic Polling --> millis   %lu  -  %lu >= %d\n", seconds, pPoll->second.elapse_time, pCurrentNode->second.sample_rate);
@@ -1026,8 +945,8 @@ void SpidermeshApi::automaticNodePolling()
             apiframe user_req_to_append = cbAutoRequestBuilder(pPoll);
 
             if(user_req_to_append.size() >0) rqt_status = user_req_to_append;
-            else if(type_json[t]["command"].containsKey("status"))
-                rqt_status.push_back(type_json[t]["command"]["status"]["rqst"].as<byte>());
+            else if(nodes.getTypeJsonVariant()[t]["command"].containsKey("status"))
+                rqt_status.push_back(nodes.getTypeJsonVariant()[t]["command"]["status"]["rqst"].as<byte>());
 
             //set the address of the node to poll in the transmission buffer
             byte sz = 6 + rqt_status.size();

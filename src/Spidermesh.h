@@ -41,7 +41,18 @@
 
 
 
+/*
+#ifdef SIMULATION == SIMULATION_END
+    #define SIMULATION_BULKUPLOAD               false
+    #define SIMULATION_GETMISSINGFLAGS          false
+    #define SIMULATION_PRUNE_VALID_PAGES    false
+    #define SIMULATION_CHECK_IF_CRC_OK          false
+    #define SIMULATION_SEND_META_DATA           false
+    #define SIMULATION_RESET_NODE_ON_SEEK       true
+    #define SIMULATION_SEND_MAGICWORD           true
 
+#endif
+*/
 
 
 
