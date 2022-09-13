@@ -240,7 +240,7 @@ bool SmkList::loadParamFiles()
 
             new_type.shrinkToFit();
 
-          loadType(n.second.type, new_type.as<JsonVariant>());           //insert the type in json format in the list of supported type
+          addType(n.second.type, new_type.as<JsonVariant>());           //insert the type in json format in the list of supported type
           n.second.pjson_type=type_json[n.second.type].as<JsonVariant>();   //get a pointer type for the node
 
           #if SHOW_LOAD_NODE_DEBUG
@@ -271,7 +271,7 @@ bool SmkList::loadParamFiles()
 }
 
 //------------------------------------------------------------------------------------------------------------
-bool SmkList::loadType(String type, JsonVariant src_type_json)
+bool SmkList::addType(String type, JsonVariant src_type_json)
 {
     //TODO: optionnal, test could be done to verify minimum requirement of type since user could use this function
 
@@ -283,7 +283,7 @@ bool SmkList::loadType(String type, JsonVariant src_type_json)
 }
 
 //------------------------------------------------------------------------------------------------------------
-bool SmkList::loadType(String type, String json_string)
+bool SmkList::addType(String type, String json_string)
 {
     DynamicJsonDocument new_type(SIZE_OF_DYNAMIC_JSON_TYPE);
     
@@ -296,7 +296,7 @@ bool SmkList::loadType(String type, String json_string)
       #endif
     }else new_type.shrinkToFit();
 
-    return loadType(type, new_type.as<JsonVariant>());           //insert the type in json format in the list of supported type
+    return addType(type, new_type.as<JsonVariant>());           //insert the type in json format in the list of supported type
 
 }
 

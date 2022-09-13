@@ -115,7 +115,7 @@ void CallbackLoadExternalFileDefinition()
 	//smk900.nodes.loadTypes("{\"vacuum\":{\"parser\":{\"status\":{\"params\":{\"rssi\":{\"pos\":[0,8]},\"vacuum\":{\"pos\":[8,16]},\"temperature\":{\"pos\":[24,8]},\"volt\":{\"pos\":[32,8]}}}}}}");
 
 	//loading of one type at the time
-	//smk900.nodes.loadType("vacuum", "{\"parser\":{\"status\":{\"params\":{\"rssi\":{\"pos\":[0,8]},\"vacuum\":{\"pos\":[8,16]},\"temperature\":{\"pos\":[24,8]},\"volt\":{\"pos\":[32,8]}}}}}");
+	//smk900.nodes.addType("vacuum", "{\"parser\":{\"status\":{\"params\":{\"rssi\":{\"pos\":[0,8]},\"vacuum\":{\"pos\":[8,16]},\"temperature\":{\"pos\":[24,8]},\"volt\":{\"pos\":[32,8]}}}}}");
 }
 #endif
 

@@ -194,8 +194,8 @@ public:
 	bool loadParamFiles();
 	static bool loadNodes(JsonVariant nodes_json);
 	static bool loadNodes(String nodes);
-	static bool loadType(String type, JsonVariant src_type_json);
-	static bool loadType(String type, String json_string);
+	static bool addType(String type, JsonVariant src_type_json);
+	static bool addType(String type, String json_string);
 	static bool loadTypes(String json_string);
 
 	void assignTypeToNode();
