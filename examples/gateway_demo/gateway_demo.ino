@@ -108,7 +108,9 @@ void CallbackLoadExternalFileDefinition()
 	Serial.println(mac_gateway);
 
 	//--------------------------------------------------------
-	//example of loading nodes list available and the types
+	// example of loading nodes list available and the types, 
+	// it can be fetch from any kind database accessible with http or mqtt
+	// you can use the mac gateway to identify the list of nodes and types to fetch
 	//smk900.nodes.loadNodes("{\"0.0.172.51\":{\"name\":\"Office1\",\"type\":\"vacuum\"},\"0.0.172.52\":{\"name\":\"Office2\",\"type\":\"vacuum\"},\"0.0.64.62\":{\"name\":\"Office3\",\"type\":\"vacuum\"}}");
 
 	//loading of all the type available
