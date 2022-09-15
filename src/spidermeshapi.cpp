@@ -706,7 +706,7 @@ void SpidermeshApi::CheckIfAnswerWasExpectedAndCallSuccessFunction(apiframe rxPk
             //if packet is local
             if(rxPkt[3] != PACKET_REMOTE_ANSWER)
             {
-                if((i->_packet_type | 0x10) == rxPkt[3])
+                if((i->_request[3] | 0x10) == rxPkt[3])
                 {
                     #if SHOW_EXPECT_EVENT
                         Serial.println(" = expect local match found ");
@@ -722,7 +722,7 @@ void SpidermeshApi::CheckIfAnswerWasExpectedAndCallSuccessFunction(apiframe rxPk
             }
             //since it is remote check the remote packet type futher
             
-            else if((i->_packet_type | 0x10) == (rxPkt[6] & 0x7F))
+            else if((i->_request[5] | 0x10) == (rxPkt[6]))
             {
               #if SHOW_EXPECT_EVENT
                 Serial.println("  = remote packet match");
