@@ -209,7 +209,7 @@ void loop()
 	//broadcast to all node variable 1 every 15min, will be sent at the next available broadcast cycle
 	if(millis()-last_broadcast > 15000){
 		Serial.println("Broadcast message");
-		smk900.addBroadcastPacket({0x01}); 
+		smk900.addBroadcastPacket({0x01,0x02,0x03}); 
 		last_broadcast = millis();
 	}
 	#endif
