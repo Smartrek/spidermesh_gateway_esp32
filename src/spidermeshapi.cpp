@@ -1072,3 +1072,28 @@ bool SpidermeshApi::findNext(bool onlyRemote, bool initSearch)
 
 	return ret;
 }
+
+
+bool SpidermeshApi::addBroadcastPacket(apiframe payload, bool prior_lvl)
+{
+    apiframe pkt2add = {0xFB,0x00,0x00,0x0C,0x00,0x4E};
+
+    int len = payload.size() + 3;
+    pkt2add[1] = len & 0xFF;
+    pkt2add[2] = (len>>8) & 0xFF;		
+
+    for(auto b:payload) pkt2add.push_back(b);
+
+    if(show_apipkt_out)
+        printApiPacket(pkt2add, PREFIX_OUT);
+
+    if (prior_lvl)
+    {
+        addApiPacketHighPriority(pkt2add);
+        return true;
+    }
+    else
+        addApiPacketLowPriority(pkt2add);
+    return false;
+};
+

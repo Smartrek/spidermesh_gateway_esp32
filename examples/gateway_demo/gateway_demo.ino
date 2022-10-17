@@ -32,7 +32,7 @@
 #define TEST_AUTOMATIC_NODE_POLLING
 //#define TEST_REQUEST_BUILDER
 //#define TEST_UNICAST_TO_NODE
-//#define TEST_BROADCAST_TO_ALL_NODE
+#define TEST_BROADCAST_TO_ALL_NODE
 //#define TEST_OTA_UPDATE
 //#define TEST_LOAD_EXTERNAL_FILES_DEFINITION
 
@@ -209,7 +209,7 @@ void loop()
 	//broadcast to all node variable 1 every 15min, will be sent at the next available broadcast cycle
 	if(millis()-last_broadcast > 15000){
 		Serial.println("Broadcast message");
-		smk900.addApiPacket({0x0C,0x00,0x4E,0x01}); 
+		smk900.addBroadcastPacket({0x01}); 
 		last_broadcast = millis();
 	}
 	#endif

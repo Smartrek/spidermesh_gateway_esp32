@@ -141,6 +141,17 @@ if(p != smk900.nodes.pool.end())
 }
 ```
 
+### Broadcast API call
+The function addBroadcastPacket will create a API frame with a payload define as the parameter of the function and will be sent to all node at the next available broadcast cycle. The packet will be processed at the exact same time on all nodes (+/- few microsecond). In the following example, the payload {0x01, 0x02, 0x03} will be sent at the next available broadcast cycle.
+
+```c++
+if(millis()-last_broadcast > 15000){
+	Serial.println("Broadcast message");
+	smk900.addBroadcastPacket({0x01, 0x02, 0x03}); 
+	last_broadcast = millis();
+}
+```
+
 ## Node definition
 for the automatic polling function to work, it is necessary to define which node are available to poll and what data are expected to each of the node. For this reason, there is one files that defines which node are available and multiples files to allow the parsing machine to convert the raw data of the payload into a readable format
 

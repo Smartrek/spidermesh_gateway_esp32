@@ -354,7 +354,12 @@ public:
 	static bool addApiPacket(const char *asciiCommand) { return addApiPacketLowPriority(asciiCommand); };
 	static bool addApiPacket(String asciiCommand) { return addApiPacketLowPriority(asciiCommand); };
 	static bool addApiPacket(uint8_t *buffer, int size) { return addApiPacketLowPriority(buffer, size); };
-	;
+
+
+	//------------------------------------------------
+	// all content of payload will be append to a broadcast api frame,
+	// size of packet will be set accordingly
+	static bool addBroadcastPacket(apiframe payload, bool prior_lvl=false);
 
 	static bool isMessageStackEmpty() { return !(lowPriorityFifoCommandList.size() + highPriorityFifoCommandList.size()); };
 	static apiframe checkNextPacketToSend() { return lowPriorityFifoCommandList.front(); };
