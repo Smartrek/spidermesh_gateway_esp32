@@ -77,7 +77,7 @@ void Spidermesh::smkGatewayTaskCore(void *pvParameters)
 
 	String mode = getPollingMode();
 	if (mode == "time" || mode == "fast")
-		setAutoPollingNodeMode(true);
+		setAutoPolling(true);
 
 	while (true)
 	{
@@ -401,7 +401,7 @@ bool Spidermesh::ProcessState(bool eob)
 		ret = false;
 
         bool have_send_packet = sendNextPacketBuffered();
-		if(isAutoPollingNodeEnabled() && !have_send_packet && isMode(READY))
+		if(isAutoPolling() && !have_send_packet && isMode(READY))
 		{
 			if(eob)automaticNodePolling();
 			//delay(5);
@@ -413,47 +413,45 @@ bool Spidermesh::ProcessState(bool eob)
 		PRTLN("\n--> CHECK_FILE_AND_LOAD_IF_AVAILABLE");
 		
 
-		if (1)
+		setMode(UPDATE_NODES);
+		setState(STOP);
+		setAutoPolling(false);
+		otaResult = "start at " + getTimeFormated();
+
+		if (!firmware.open(firmware.filename))
 		{
-			setMode(UPDATE_NODES);
-			setState(STOP);
-			setAutoPollingNodeMode(false);
-			otaResult = "start at " + getTimeFormated();
+			PRTLN("Cannont open file");
+			setState(IDLE);
+			return false;
+		}
+		firmware.close();
 
-			if (!firmware.open(firmware.filename))
-			{
-				PRTLN("Cannont open file");
-				setState(IDLE);
-				return false;
-			}
-			firmware.close();
+		if (!firmware.validationUf2Integrity())
+		{
+			PRTLN("UF2 file is corrupted");
+			return false;
+		}
 
-			if (!firmware.validationUf2Integrity())
-			{
-				PRTLN("UF2 file is corrupted");
-				return false;
-			}
+		firmware.calculOfEstimatedTime(getNumberOfNodeToUpdate());
+		setOtaTimeout(600000);
 
-			firmware.calculOfEstimatedTime(getNumberOfNodeToUpdate());
-			setOtaTimeout(600000);
-
-			setState(INIT_GATEWAY_REGISTER);
-			logJson("UF2 OK");
-			requiredMeshSpeed.rf_speed = PRESET_72B;
-			requiredMeshSpeed.duty = 5;
+		setState(INIT_GATEWAY_REGISTER);
+		logJson("UF2 OK");
+		requiredMeshSpeed.rf_speed = PRESET_72B;
+		requiredMeshSpeed.duty = 5;
 
 /*
-			if (firmware.getType() == SMK900)
-				setState(INIT_GATEWAY_REGISTER);
-			else if (firmware.getType() == PYBOARD)
-				setState(SLOW_DYN_FOR_SIM_BUTTON);
-			else if (firmware.getType() == EVM)
-				setState(INIT_GATEWAY_REGISTER);
-			setOtaTimeout(10000);
+		if (firmware.getType() == SMK900)
+			setState(INIT_GATEWAY_REGISTER);
+		else if (firmware.getType() == PYBOARD)
+			setState(SLOW_DYN_FOR_SIM_BUTTON);
+		else if (firmware.getType() == EVM)
+			setState(INIT_GATEWAY_REGISTER);
+		setOtaTimeout(10000);
 */
 
-			dumpReceivedBuffer();
-		}
+		dumpReceivedBuffer();
+
 	}
 	else if (isState(INIT_GATEWAY_REGISTER))
 	{

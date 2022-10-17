@@ -1005,11 +1005,11 @@ bool SpidermeshApi::enableAutomaticPolling(String mode,String mac, uint16_t dura
     {
         
         polling_mode = mode; //default mode
-        setAutoPollingNodeMode(true);
+        setAutoPolling(true);
     }
     else if (mode == "disabled" || readFile("pollingMode") == "disabled")
     {
-        setAutoPollingNodeMode(false);
+        setAutoPolling(false);
     }
     return ret;
 }

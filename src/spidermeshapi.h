@@ -290,12 +290,10 @@ public:
 
 	static void task();
 	void pollNodeList();
-	static void setAutoPollingNodeMode(bool mode = true)
-	{
-		_auto_polling_mode = mode;
-	};
+	static void setAutoPolling(bool mode = true) {_auto_polling_mode = mode;};
+	static bool getAutoPolling() {return _auto_polling_mode;};
+	static bool isAutoPolling() { return _auto_polling_mode; };
 
-	static bool isAutoPollingNodeEnabled() { return _auto_polling_mode; };
 	static bool setFocusMode(uint32_t node)
 	{
 		focus_node = node;
