@@ -27,28 +27,28 @@ union u_bytes
 };
 
 
-typedef std::vector<byte> hexPacket_t;
+typedef std::vector<byte> apiframe;
 #include <esp_drive.h>
-hexPacket_t convertAsciiTohexCommand(const char *asciiCommand);
-bool putPacketInsideBuffer(hexPacket_t packet, uint8_t* buffer);
+apiframe convertAsciiTohexCommand(const char *asciiCommand);
+bool putPacketInsideBuffer(apiframe packet, uint8_t* buffer);
 void printApiPacket(uint8_t* buffer, int size);
-void printApiPacket(hexPacket_t hcmd, String prefix = "");
+void printApiPacket(apiframe hcmd, String prefix = "");
 void setupWatchdog(hw_timer_t** pWatchdog, long millis, void (*fn)(void));
 void kickWatchdog(hw_timer_t* watchdog);
 std::vector<String> splitString(String in, char splitChar);
 String cleanString(String toClean);
-String hexPacketToAscii(hexPacket_t hcmd);
+String hexPacketToAscii(apiframe hcmd);
 String ApplyFixPoint(word num, int fix);
-hexPacket_t asciiTohexPacket(String acmd);
+apiframe asciiTohexPacket(String acmd);
 void setNtpClock(bool force=false);
 void printLocalTime();
 String getTimeFormated();
 String getMinTimeFormated();
-value_converter_union extractByteFromApiPacket(hexPacket_t p, uint16_t idx, uint16_t len=2);
+value_converter_union extractByteFromApiPacket(apiframe p, uint16_t idx, uint16_t len=2);
 
 
-uint32_t extractU32(hexPacket_t p, int pos);
-uint32_t extractU16(hexPacket_t p, int pos);
+uint32_t extractU32(apiframe p, int pos);
+uint32_t extractU16(apiframe p, int pos);
 std::vector<String> ValidationEthernetConfig(String data);
 
 bool macStringToInt(String ipStr, uint32_t *ip);

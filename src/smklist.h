@@ -143,15 +143,15 @@ public:
 };
 
 typedef std::map<uint32_t, SmkNode> mesh_t;
-typedef std::function<void(mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic)> ExpectCallback;
-typedef std::function<hexPacket_t(mesh_t::iterator pNode)> RequestBuilderCallback;
+typedef std::function<void(mesh_t::iterator pNode, apiframe packet, bool success, String tag)> ExpectCallback;
+typedef std::function<apiframe(mesh_t::iterator pNode)> RequestBuilderCallback;
 
 typedef struct
 {
 	mesh_t::iterator pNode;
-	hexPacket_t payload;
+	apiframe payload;
 	ExpectCallback callback;
-	String topic;
+	String tag;
 } MeshRequest_t;
 
 class ParamList_t
@@ -172,37 +172,33 @@ public:
 class SmkList
 {
 private:
+	//static DynamicJsonDocument type_json;
 public:
+	static DynamicJsonDocument type_json;
 	// std::map<String, NodeType_t> nType;
+	static JsonVariant getTypeJsonVariant();
 
-	mesh_t pool;
+	static mesh_t pool;
 
 	// SmkNodeType smkType;
 	int _count;
-	String _fList;
 	String _fValues;
 	std::vector<String> trailList;
 	std::map<String, int> conversion_type;
-	JsonVariant jsonType;
 	uint16_t retry_counter;
 
 public:
-	SmkList(){
-
-	};
-	SmkList(String flist, JsonVariant type_json_main_file);
-
+	SmkList();
 	bool insertNewNodeInList(std::vector<SmkNode> *node_list, String node_line);
 
-	bool loadParamFiles()
-	{
-		loadNodes();
-		loadType(jsonType);
+	bool loadParamFiles();
+	static bool loadNodes(JsonVariant nodes_json);
+	static bool loadNodes(String nodes);
+	static bool addType(String type, JsonVariant src_type_json);
+	static bool addType(String type, String json_string);
+	static bool loadTypes(String json_string);
 
-		return true;
-	};
-	bool loadNodes(const char *file = "/nodes.json");
-	bool loadType(JsonVariant type_json);
+	void assignTypeToNode();
 	mesh_t::iterator find(uint32_t add)
 	{
 		for (auto x = pool.begin(); x != pool.end(); x++)
@@ -214,7 +210,6 @@ public:
 	};
 
 	//------------------------------------------------------------------------------
-	bool writeNodeListToFile(const char *file = "/nodes.json");
 
 	// void save();
 private:

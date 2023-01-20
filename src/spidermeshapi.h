@@ -33,9 +33,9 @@
 #define DUTY_DEFAULT 5 // 20%
 #define PRESET_RF 0	   // 20B: 0x00    72B: 0x10
 
-typedef std::list<hexPacket_t> commandList_t;
+typedef std::list<apiframe> commandList_t;
 typedef std::list<MeshRequest_t> WriteAndExpectList_t;
-typedef std::list<hexPacket_t> listPacket_t;
+typedef std::list<apiframe> listPacket_t;
 
 #define ON_DEMAND_COMMAND_MUST_BE_DIFFERENT_FROM_THE_LAST_ONE 0
 
@@ -139,16 +139,16 @@ public:
 	int16_t _size;
 	ExpectCallback _expect_callback;
 	// void (*_expect_callback)(const mesh_t::iterator pNode, bool success);
-	hexPacket_t _request;
-	hexPacket_t _expectPayload;
-	String _topic;
+	apiframe _request;
+	apiframe _expectPayload;
+	String _tag;
 
 	ExpectAnswer(){};
-	ExpectAnswer(mesh_t::iterator pNode, uint8_t packet_type, hexPacket_t request, ExpectCallback expect_callback, String topic = "", uint8_t max_retry = 0, hexPacket_t expectPayload = {}, int16_t size = -1)
+	ExpectAnswer(mesh_t::iterator pNode, uint8_t packet_type, apiframe request, ExpectCallback expect_callback, String tag = "", uint8_t max_retry = 0, apiframe expectPayload = {}, int16_t size = -1)
 	{
-		init(pNode, packet_type, request, expect_callback, topic, max_retry, expectPayload, size);
+		init(pNode, packet_type, request, expect_callback, tag, max_retry, expectPayload, size);
 	};
-	void init(mesh_t::iterator pNode, uint8_t packet_type, hexPacket_t request, ExpectCallback expect_callback, String topic = "", uint8_t max_retry = 0, hexPacket_t expectPayload = {}, int16_t size = -1)
+	void init(mesh_t::iterator pNode, uint8_t packet_type, apiframe request, ExpectCallback expect_callback, String tag = "", uint8_t max_retry = 0, apiframe expectPayload = {}, int16_t size = -1)
 	{
 		_pNode = pNode;
 		_packet_type = packet_type;
@@ -160,20 +160,20 @@ public:
 		_request = request;
 		_size = size;
 		_expectPayload = expectPayload;
-		_topic = topic;
+		_tag = tag;
 
 	};
 };
 
 //--------------------------------------------------------------------------
 
-class Smk900
+class SpidermeshApi
 {
 
 private:
 	static unsigned char state_serial;
 
-	static hexPacket_t current_packet;
+	static apiframe current_packet;
 	static HardwareSerial smkport;
 
 public:
@@ -190,10 +190,13 @@ public:
 	static bool show_apipkt_in;
 	static bool show_apipkt_out;
 
-	static void setWhenPacketReceived(std::function<void(hexPacket_t)> fn) { cbWhenPacketReceived = fn; };
+
+	static JsonVariant getTypeJsonVariant();
+
+	static void setWhenPacketReceived(std::function<void(apiframe)> fn) { cbWhenPacketReceived = fn; };
 	static void setCallbackAutomaticPolling(ExpectCallback fn){cbAutomaticPolling = fn;};
-	static void setCallbackAutoRequestBuilder(std::function<hexPacket_t(mesh_t::iterator)> fn ){cbAutoRequestBuilder=fn;}
-	static std::function<void(hexPacket_t)> cbWhenPacketReceived;
+	static void setCallbackAutoRequestBuilder(std::function<apiframe(mesh_t::iterator)> fn ){cbAutoRequestBuilder=fn;}
+	static std::function<void(apiframe)> cbWhenPacketReceived;
 	static void setWhenEobIsReceived(std::function<bool(bool)> fn) { WhenEobIsReceived = fn; };
 	static std::function<bool(bool)> WhenEobIsReceived;
 
@@ -202,7 +205,7 @@ public:
 
 	static unsigned char bufferRx[30];
 	static uint16_t length_packet;
-	Smk900();
+	SpidermeshApi();
 	static bool init();
 
 	static void reset();
@@ -216,8 +219,7 @@ public:
 	static bool gatewayMacAddressIsReceived;
 	static bool isGatewayMacIsReceived() { return gatewayMacAddressIsReceived; };
 	static bool isGatewayMacAvailable() { return gatewayMacAddressIsReceived; };
-	static void SaveGatewayMacAddress(hexPacket_t packet);
-	static void loadList();
+	static void SaveGatewayMacAddress(apiframe packet);
 	static String getMacGateway()
 	{
 		String ret = "";
@@ -232,13 +234,13 @@ public:
 		show_apipkt_out = msg_out;		
 	}
 
-	static hexPacket_t setDyn(uint8_t po, uint8_t pi, uint8_t hop, uint8_t rdx, uint8_t rde, uint8_t duty);
-	static hexPacket_t requestMacAddress();
-	static hexPacket_t localSetRegister(uint8_t offset_register, uint8_t size_register, uint8_t *content);
-	static hexPacket_t localTransfertConfigFromRAMBUFF(uint8_t location);
+	static apiframe setDyn(uint8_t po, uint8_t pi, uint8_t hop, uint8_t rdx, uint8_t rde, uint8_t duty);
+	static apiframe requestMacAddress();
+	static apiframe localSetRegister(uint8_t offset_register, uint8_t size_register, uint8_t *content);
+	static apiframe localTransfertConfigFromRAMBUFF(uint8_t location);
 
 	static void write(uint32_t c);
-	static void write(hexPacket_t p)
+	static void write(apiframe p)
 	{
 		for (uint8_t c : p)
 		{
@@ -284,17 +286,14 @@ public:
 	{
 		return nodes.pool.size();
 	};
-	bool addNewNode(JsonVariant pSource);
 	String getAvailabilityNodes();
 
 	static void task();
 	void pollNodeList();
-	static void setAutoPollingNodeMode(bool mode = true)
-	{
-		_auto_polling_mode = mode;
-	};
+	static void setAutoPolling(bool mode = true) {_auto_polling_mode = mode;};
+	static bool getAutoPolling() {return _auto_polling_mode;};
+	static bool isAutoPolling() { return _auto_polling_mode; };
 
-	static bool isAutoPollingNodeEnabled() { return _auto_polling_mode; };
 	static bool setFocusMode(uint32_t node)
 	{
 		focus_node = node;
@@ -321,7 +320,7 @@ public:
 		}
 		return ret;
 	};
-	static String sendCommand(hexPacket_t cmd);
+	static String sendCommand(apiframe cmd);
 
 private:
 	static bool _auto_polling_mode;
@@ -341,7 +340,7 @@ public:
 
 	//------------------------------------------------
 	// API COMMMAND SECTION
-	static bool addApiPacket(hexPacket_t pkt, bool prior_lvl=false)
+	static bool addApiPacket(apiframe pkt, bool prior_lvl=false)
 	{
 		if (prior_lvl)
 		{
@@ -355,12 +354,17 @@ public:
 	static bool addApiPacket(const char *asciiCommand) { return addApiPacketLowPriority(asciiCommand); };
 	static bool addApiPacket(String asciiCommand) { return addApiPacketLowPriority(asciiCommand); };
 	static bool addApiPacket(uint8_t *buffer, int size) { return addApiPacketLowPriority(buffer, size); };
-	;
+
+
+	//------------------------------------------------
+	// all content of payload will be append to a broadcast api frame,
+	// size of packet will be set accordingly
+	static bool addBroadcastPacket(apiframe payload, bool prior_lvl=false);
 
 	static bool isMessageStackEmpty() { return !(lowPriorityFifoCommandList.size() + highPriorityFifoCommandList.size()); };
-	static hexPacket_t checkNextPacketToSend() { return lowPriorityFifoCommandList.front(); };
+	static apiframe checkNextPacketToSend() { return lowPriorityFifoCommandList.front(); };
 	static bool isOtaPacketSendInThisCycle() { return _otaPacketInCycle; };
-	static bool isEobPacket(hexPacket_t pkt)
+	static bool isEobPacket(apiframe pkt)
 	{
 		if (pkt.size() > 3)
 			if (pkt[3] == PACKET_EOB)
@@ -385,18 +389,18 @@ private:
 
 
 public:
-	static bool addApiPacketLowPriority(hexPacket_t hexCommand);
+	static bool addApiPacketLowPriority(apiframe hexCommand);
 	static bool addApiPacketLowPriority(String asciiCommand);
 	static bool addApiPacketLowPriority(const char *asciiCommand);
 	static bool addApiPacketLowPriority(uint8_t *buffer, int size);
-	static bool addApiPacketHighPriority(hexPacket_t hcmd);
+	static bool addApiPacketHighPriority(apiframe hcmd);
 
 	static bool addWriteExpect(MeshRequest_t r)
 	{
 		writeAndExpectList.push_back(r);
 		return true;
 	};
-	static bool addWriteExpect(mesh_t::iterator p, hexPacket_t h, String t, ExpectCallback cb)
+	static bool addWriteExpect(mesh_t::iterator p, apiframe h, String t, ExpectCallback cb)
 	{
 		MeshRequest_t req = {p, h, cb, t};
 		writeAndExpectList.push_back(req);
@@ -425,25 +429,25 @@ public:
 	static std::list<ExpectAnswer> listOfExpectedAnswer;
 
 	static void WriteAndExpectAnwser(
-		mesh_t::iterator pNode, hexPacket_t request, uint8_t packet_type,
-		uint8_t max_retry = 0, hexPacket_t expectPayload = {}, int16_t size = -1, String topic="", 
-		ExpectCallback cb = [](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void {});
+		mesh_t::iterator pNode, apiframe request, uint8_t packet_type,
+		uint8_t max_retry = 0, apiframe expectPayload = {}, int16_t size = -1, String tag="", 
+		ExpectCallback cb = [](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void {});
 
 	static void WriteAndExpectAnwser(
-		mesh_t::iterator pNode, hexPacket_t request, uint8_t packet_type, String topic="",
-		ExpectCallback cb = [](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void {});
+		mesh_t::iterator pNode, apiframe request, uint8_t packet_type, String tag="",
+		ExpectCallback cb = [](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void {});
 
 	static void WriteAndExpectAnwser(
-		mesh_t::iterator pNode, hexPacket_t request, uint8_t packet_type, uint8_t max_retry, String topic="",
-		ExpectCallback cb = [](mesh_t::iterator pNode, hexPacket_t packet, bool success, String topic) -> void {});
+		mesh_t::iterator pNode, apiframe request, uint8_t packet_type, uint8_t max_retry, String tag="",
+		ExpectCallback cb = [](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void {});
 
-	static void CheckIfAnswerWasExpectedAndCallSuccessFunction(hexPacket_t rxPkt);
+	static void CheckIfAnswerWasExpectedAndCallSuccessFunction(apiframe rxPkt);
 	static void CheckExpectTimeout();
 
 	static mesh_t::iterator pCurrentNode;
 	static void automaticNodePolling();
 
-	static void AddToTerminalBuffer(String head, hexPacket_t *cmd);
+	static void AddToTerminalBuffer(String head, apiframe *cmd);
 
 #ifdef PORTIA_KLIK_THREADSAFING_ENABLED
 private:
@@ -454,8 +458,6 @@ private:
 
 private:
 	static SemaphoreHandle_t xMutex;
-
-	// std::vector< otaNodeList;
 
 public:
 
@@ -470,7 +472,7 @@ public:
 
 
 
-	static hexPacket_t apiPacket(uint8_t cmd, hexPacket_t pkt, bool local=true, bool broadcastOtaUpdate = false, uint8_t phase = 0)
+	static apiframe apiPacket(uint8_t cmd, apiframe pkt, bool local=true, bool broadcastOtaUpdate = false, uint8_t phase = 0)
 	{
 
 		if(!local)
@@ -501,7 +503,7 @@ public:
 		return pkt;
 	};
 
-	static hexPacket_t apiPacket(mesh_t::iterator pNode, uint8_t cmd, hexPacket_t pkt, bool local=true, bool broadcastOtaUpdate = false, uint8_t phase = 0)
+	static apiframe apiPacket(mesh_t::iterator pNode, uint8_t cmd, apiframe pkt, bool local=true, bool broadcastOtaUpdate = false, uint8_t phase = 0)
 	{
 
 		if(!local)
@@ -533,8 +535,8 @@ public:
 
 
 	/*
-	hexPacket_t apiPacket(hexPacket_t pkt, mesh_t::iterator pNode, hexPacket_t tail = {});
-	hexPacket_t apiPacket(hexPacket_t pkt, mesh_t::iterator pNode, hexPacket_t sub_command, byte *payload, uint16_t len_payload);
+	apiframe apiPacket(apiframe pkt, mesh_t::iterator pNode, apiframe tail = {});
+	apiframe apiPacket(apiframe pkt, mesh_t::iterator pNode, apiframe sub_command, byte *payload, uint16_t len_payload);
 	*/
 
 	static bool findNext(bool onlyRemote=true, bool initSearch=false);

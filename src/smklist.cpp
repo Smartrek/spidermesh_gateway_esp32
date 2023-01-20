@@ -1,62 +1,37 @@
 #include <smklist.h>
 
-
-
+DynamicJsonDocument SmkList::type_json(SIZE_OF_DYNAMIC_JSON_FILE);
+mesh_t SmkList::pool;
 
 //------------------------------------------------------------------------------------------------------------
-SmkList::SmkList(String flist, JsonVariant type_json_main_file)
+SmkList::SmkList()
 {
-    _fList = flist;
     conversion_type.insert(std::pair<String,int>("int", 0));
     conversion_type.insert(std::pair<String,int>("float", 3));   
-    jsonType = type_json_main_file;
-    loadParamFiles(); 
 }
 
 //------------------------------------------------------------------------------------------------------------
-bool SmkList::loadNodes(const char* file)
+bool SmkList::loadNodes(String nodes)
 {
-    DynamicJsonDocument jsonFile(SIZE_OF_DYNAMIC_JSON_FILE);
-  #if SHOW_LOAD_NODE_DEBUG
-    Serial.print("Open file:");
-    Serial.println(file);
-    readFile(file);
-
-  #endif
-    File f=SPIFFS.open(file);
-    if(!f)
-    {
-      #if SHOW_LOAD_NODE_DEBUG
-        Serial.print("  error while loading ");
-        Serial.println(file);
-      #endif
-        return false;
-    }
-    DeserializationError error = deserializeJson(jsonFile, f);
-    if(error)
-    {
-      #if SHOW_LOAD_NODE_DEBUG
-        Serial.print("  error during deserialization of ");
-        Serial.println(file);
-      #endif
-        return false;
-    }
-    f.close();
-
-
-    //JsonObject root = nodeListJson.as<JsonObject>();
-
-    //DynamicJsonDocument nodeListJson(10000);
-
-
   #if SHOW_LOAD_NODE_DEBUG
     Serial.printf("--------------------------------\r\n");
     Serial.printf("   node list\r\n");
     Serial.printf("--------------------------------\r\n");
   #endif
 
+    DynamicJsonDocument nodes_json(SIZE_OF_DYNAMIC_JSON_FILE);
 
-    for (JsonPair kv : jsonFile.as<JsonObject>()) 
+    DeserializationError error = deserializeJson(nodes_json, nodes);
+    if(error)
+    {
+      #if SHOW_LOAD_NODE_DEBUG
+        Serial.print("  error during deserialization of string ");
+      #endif
+        return false;
+    }
+
+
+    for (JsonPair kv : nodes_json.as<JsonObject>()) 
     {
         SmkNode x;//create new node
         JsonObject j = kv.value().as<JsonObject>();
@@ -117,20 +92,129 @@ bool SmkList::loadNodes(const char* file)
 }
 
 //------------------------------------------------------------------------------------------------------------
-bool SmkList::loadType(JsonVariant type_json)
+bool SmkList::loadNodes(JsonVariant nodes_json)
 {
-    //for all node, check if type is not loaded, if not loaded, read json file to load it
-    //shrink will be done in the main to reduce heap memory usage when all will be there
-    for(auto smklist:pool)
+  #if SHOW_LOAD_NODE_DEBUG
+    Serial.printf("--------------------------------\r\n");
+    Serial.printf("   node list\r\n");
+    Serial.printf("--------------------------------\r\n");
+  #endif
+
+
+    for (JsonPair kv : nodes_json.as<JsonObject>()) 
     {
-        if(!type_json.containsKey(smklist.second.type))
-        {
+        SmkNode x;//create new node
+        JsonObject j = kv.value().as<JsonObject>();
+
+        //String node_name = kv.key().c_str();
+        x.name = j["name"].as<String>();
+
+        //load of group
+        if(j.containsKey("group")) x.group = j["group"].as<String>();
+        else if(j.containsKey("trail")) x.group = j["trail"].as<String>(); //for legacy snofi
+        else x.group = "";
+        
+        //mac address
+        x.mac.address = macString2Umac(kv.key().c_str());
+        x.type = j["type"].as<String>();
+        x.enabled = (j.containsKey("enabled")) ? j["enabled"].as<bool>(): true;
+        x.local =(j.containsKey("local"))?j["local"].as<bool>():false;
+        x.sample_rate = (j.containsKey("srate"))?j["srate"].as<int>():0;
+        
+
+        //Internal variable of node
+        x.nb_retry_count=0;
+        x.dataValid=false;
+        #if MODBUS_REGISTER_ENABLED
+        x.startAddresseModbusRegister = j["start_address"].as<int>();
+        #endif
+
+        x.elapse_time = 0;
+        #if MODBUS_REGISTER_ENABLED
+        x.valid_node_index_for_read_coil_bit = index_order_entry++;
+        #endif
+
+        x.otaStep = STEP_INIT;
+
+        //addition of the node into the pool list
+        pool.insert(std::make_pair(x.mac.address,x));
+        #if SHOW_LOAD_NODE_DEBUG
+          Serial.print("  new node:");
+          Serial.print(kv.key().c_str());
+          Serial.print("  name:");
+          Serial.print(x.name);
+          Serial.print("  type:");
+          Serial.println(x.type);
+        #endif
+    }
+  #if SHOW_LOAD_NODE_DEBUG
+    Serial.printf("--------------------------------\r\n");
+  #endif
+
+  #if SHOW_LOAD_NODE_DEBUG || SHOW_MIN_DEBUG
+    Serial.println("Node list file loaded successfully.");
+  #endif
+
+
+
+
+  return true;
+}
+
+//------------------------------------------------------------------------------------------------------------
+JsonVariant SmkList::getTypeJsonVariant()
+{
+    return type_json.as<JsonVariant>();
+}
+
+//------------------------------------------------------------------------------------------------------------
+bool SmkList::loadParamFiles()
+{
+    bool ret = true;
+    DynamicJsonDocument json_buffer(SIZE_OF_DYNAMIC_JSON_FILE);
+    String file = "/nodes.json";
+  #if SHOW_LOAD_NODE_DEBUG
+    Serial.print("Open file:");
+    Serial.println(file);
+    readFile(file);
+
+  #endif
+    File f=SPIFFS.open(file);
+    if(!f)
+    {
+      #if SHOW_LOAD_NODE_DEBUG
+        Serial.print("  error while loading ");
+        Serial.println(file);
+      #endif
+        ret= false;
+    }
+    DeserializationError error = deserializeJson(json_buffer, f);
+    if(error)
+    {
+      #if SHOW_LOAD_NODE_DEBUG
+        Serial.print("  error during deserialization of ");
+        Serial.println(file);
+      #endif
+        ret = false;
+    }
+    f.close();
+
+
+    loadNodes(json_buffer.as<JsonVariant>());
+    json_buffer.clear(); //to free memory
+
+    //for all node, check if type is not loaded, if not loaded, read json file to load it
+    for(auto n:pool)
+    {
+        if(!type_json.containsKey(n.second.type))
+        {      
             DynamicJsonDocument new_type(SIZE_OF_DYNAMIC_JSON_TYPE);
-            String path_type_file = "/type/" + smklist.second.type + "/parser.json";
+            new_type.clear();
+            String path_type_file = "/type/" + n.second.type + "/parser.json";
           #if SHOW_LOAD_NODE_DEBUG
             Serial.print("Open file: ");
             Serial.println(path_type_file);
-            readFile(path_type_file); // only for debug
+            Serial.println(readFile(path_type_file)); // only for debug
           #endif
             
             File f=SPIFFS.open(path_type_file);
@@ -140,6 +224,7 @@ bool SmkList::loadType(JsonVariant type_json)
                 Serial.print("  error while loading ");
                 Serial.println(path_type_file);
               #endif
+                continue;
                 return false;
             }
             DeserializationError error = deserializeJson(new_type, f);
@@ -148,121 +233,104 @@ bool SmkList::loadType(JsonVariant type_json)
               #if SHOW_LOAD_NODE_DEBUG
                 Serial.print("  error during deserialization of ");
                 Serial.println(path_type_file);
+                continue;
               #endif
             }
             f.close();
 
             new_type.shrinkToFit();
 
-            //JsonObject x = type_json.createNestedObject(smklist.second.type);
-            
-            type_json[smklist.second.type].set(new_type);
-            smklist.second.pjson_type=type_json[smklist.second.type].as<JsonVariant>();
-
-
+          addType(n.second.type, new_type.as<JsonVariant>());           //insert the type in json format in the list of supported type
+          n.second.pjson_type=type_json[n.second.type].as<JsonVariant>();   //get a pointer type for the node
 
           #if SHOW_LOAD_NODE_DEBUG
             Serial.printf("--------------------------------\r\n");
             Serial.print("  type: ");
-            Serial.print(smklist.second.type);
+            Serial.print(n.second.type);
             Serial.print(" loaded    size: ");
             Serial.println(new_type.memoryUsage());
             String sNew_type="";
-            serializeJson(smklist.second.pjson_type, sNew_type);
-            Serial.println(sNew_type);// smklist.second.pjson_type["command"]["status"]["rqst"].as<String>());
+            serializeJson(n.second.pjson_type, sNew_type);
+            Serial.println(sNew_type);
             Serial.printf("--------------------------------\r\n");
-          #endif
-
-
-          #if SHOW_LOAD_NODE_DEBUG
-            //Serial.println("  JSON polling command: "); printApiPacket(t.auto_polling_packet);
             Serial.print("+ new inserted type: ");
-            Serial.println(smklist.second.type);
+            Serial.println(n.second.type);
+            sNew_type="";
+            serializeJson(type_json.as<JsonVariant>(), sNew_type);
+            Serial.println(sNew_type);
             Serial.println("  ========================");
           #endif
+
+
         }
     }
+    //shrink reduce heap memory usage 
+    json_buffer.shrinkToFit();
 
-  #if SHOW_LOAD_NODE_DEBUG
-    Serial.printf("--------------------------------\r\n");
-  #endif
     return true;
 }
 
 //------------------------------------------------------------------------------------------------------------
-bool SmkList::writeNodeListToFile(const char* file)
+bool SmkList::addType(String type, JsonVariant src_type_json)
 {
+    //TODO: optionnal, test could be done to verify minimum requirement of type since user could use this function
+
+    //check if type doesn't exist
+    if(!type_json.containsKey(type))
+      type_json[type].set(src_type_json);
+
+    return true;
+}
+
+//------------------------------------------------------------------------------------------------------------
+bool SmkList::addType(String type, String json_string)
+{
+    DynamicJsonDocument new_type(SIZE_OF_DYNAMIC_JSON_TYPE);
     
-
-    DynamicJsonDocument nodeListJson(SIZE_OF_DYNAMIC_JSON_FILE);
-    //DynamicJsonDocument nodeListJson(10000);
-
-
-    Serial.println("------------ nodes that will be save -------------");
-
-    
-    String to_write="";
-    if(pool.size()) //if there is node
-    {
-        //for each node, form back a json node
-        for(auto n: pool)
-        {
-            String mac = mac2String(n.first);
-            nodeListJson[mac]["name"] = n.second.name;
-            nodeListJson[mac]["group"] = n.second.group;
-            nodeListJson[mac]["type"] = n.second.type;
-            nodeListJson[mac]["enabled"] = n.second.enabled;
-          #if MODBUS_REGISTER_ENABLED
-            nodeListJson[mac]["start_address"] = n.second.startAddresseModbusRegister;
-          #endif
-            nodeListJson[mac]["srate"] = n.second.sample_rate;
-
-            Serial.println("  name: "  + n.second.name);
-            Serial.println("  mac: "   + mac);
-            Serial.println("  group: " + n.second.group);
-            Serial.println("  type: "  + n.second.type );
-          #if MODBUS_REGISTER_ENABLED
-            Serial.println("  mb_add: " + n.second.startAddresseModbusRegister);
-          #endif
-            Serial.println("  srate: " + n.second.sample_rate);
-        }
-
-        // Serialize JSON to file
-        if (serializeJson(nodeListJson, to_write) == 0) 
-        {
-          #if SHOW_LOAD_NODE_DEBUG
-            Serial.println(F("Failed to write to file"));
-          #endif
-          return false;
-        }
-    }
-    else{
-        Serial.println("pool is empty");
-        to_write="{}"; //if there is no node
-    } 
-
-    /*
-    File f = SPIFFS.open(file, FILE_WRITE);
-    if (!f) 
+    DeserializationError error = deserializeJson(new_type, json_string);
+    if(error)
     {
       #if SHOW_LOAD_NODE_DEBUG
-        Serial.println(F("Failed to create file"));
+        Serial.print("  error during deserialization of ");
+        Serial.println(type);
       #endif
-        return false;
-    }
-    */
+    }else new_type.shrinkToFit();
+
+    return addType(type, new_type.as<JsonVariant>());           //insert the type in json format in the list of supported type
+
+}
+
+//------------------------------------------------------------------------------------------------------------
+bool SmkList::loadTypes(String json_string)
+{
+    bool ret = true;
+    DynamicJsonDocument new_type(SIZE_OF_DYNAMIC_JSON_TYPE);
     
-    if(writeDirectlyToFile("/nodes.json", to_write.c_str()))
+    DeserializationError error = deserializeJson(type_json, json_string);
+    if(error)
     {
-        //Serial.println("will write to nodes.json file-------------");
-        Serial.println(to_write);
-        
-        nodeListJson.clear();
-        //f.close();
+      #if SHOW_LOAD_NODE_DEBUG
+        Serial.print("  error during deserialization of types source");
+      #endif
+      ret = true;
     }
-    else return false;
-    
-    return true;
+    else type_json.shrinkToFit();
+
+    return ret;
+}
+
+
+//------------------------------------------------------------------------------------------------------------
+void SmkList::assignTypeToNode()
+{
+    auto n = pool.begin();
+    for(int i=0; i< pool.size(); i++)
+    {
+        if(type_json.containsKey(n->second.type)) 
+          n->second.pjson_type=type_json[n->second.type].as<JsonVariant>();
+        else
+          Serial.println("Type to assign does't exist");
+    }  
 }
 
 //------------------------------------------------------------------------------------------------------------
@@ -293,8 +361,8 @@ bool SmkList::add(uint32_t mac, String type, bool local, String group, String na
   #endif  
 
     //if the node exist update it
-    Serial.printf("Alink ");
-    Serial.printf(macInt2String(mac).c_str());
+    Serial.printf("Node ");
+    Serial.print(x.getMacAsString());
     if ( find(mac_32bit) != pool.end() )
     {
         Serial.println(" have been updated");
@@ -307,54 +375,6 @@ bool SmkList::add(uint32_t mac, String type, bool local, String group, String na
         Serial.println(" have been added to the list");
         pool.insert(std::pair<uint32_t, SmkNode>(mac_32bit, x));
     }
-
-
-
-
-
-
-
-
-
-
-
-
-  /*
-    #if MODBUS_REGISTER_ENABLED
-    if(start_mod_add ==-1) return false;
-    #endif
-
-  #if SHOW_LOAD_NODE_DEBUG
-    String node="mac:" + mac + "  group:" + group + "  name:" + name + "  type:" + type;
-    Serial.println("to add= " + node);
-  #endif
-  
-    SmkNode x;
-
-    //mac address
-    x.mac.address = macString2Umac(mac);
-    x.group = group;
-  #if MODBUS_REGISTER_ENABLED
-    x.startAddresseModbusRegister = start_mod_add;
-  #endif  
-
-
-
-    //if the node exist update it
-    if ( pool != alist.end() )
-    {
-        alist[name]=x;
-    }
-    //otherwise add it
-    else
-    {
-        alist.insert(std::pair<String, SmkNode>(name, x));
-    }
-
-    Serial.println("new node added = " + node);
-    writeNodeListToFile();
-    //load();//to redo the code indexing and init of variables
-    */
     return true;
 }
 

@@ -1,6 +1,14 @@
 {
-    "0.0.96.36": {
-        "name": "Office",
-        "type": "plc"
+    "0.0.172.51": {
+        "name": "Office1",
+        "type": "vacuum"
+    },
+    "0.0.172.52": {
+        "name": "Office2",
+        "type": "vacuum"
+    },
+    "0.0.64.62": {
+        "name": "Office3",
+        "type": "vacuum"
     }
 }
