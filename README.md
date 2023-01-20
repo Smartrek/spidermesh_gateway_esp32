@@ -106,7 +106,7 @@ Callback function to send a customizable request packet on the current automatic
 	}
 
 ### Unicast API call
-The function addWriteExpect() will add the api a packet into a queue and it will be send a the next broadcast cycle. It will pause the automatic polling cycle to allow the custom api call.
+The function addWriteExpect() will add the api a packet into a queue and it will be send at the next broadcast cycle. It will pause temporarerly the automatic polling cycle to allow the custom api call.
 
 	auto p = smk900.find("0.0.96.36");
 	if(p != smk900.nodes.pool.end())
@@ -171,6 +171,8 @@ Here a definition of a basic node that read some value inside a payload
 			}
 		}
 	}
+
+### File system
 
 NB: Data folder must be uploaded via the (Upload Filesystem Image) platformio button
 
