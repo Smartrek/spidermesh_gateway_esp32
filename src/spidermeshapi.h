@@ -290,10 +290,12 @@ public:
 
 	static void task();
 	void pollNodeList();
-	static void setAutoPolling(bool mode = true) {_auto_polling_mode = mode;};
-	static bool getAutoPolling() {return _auto_polling_mode;};
-	static bool isAutoPolling() { return _auto_polling_mode; };
+	static void setAutoPollingNodeMode(bool mode = true)
+	{
+		_auto_polling_mode = mode;
+	};
 
+	static bool isAutoPollingNodeEnabled() { return _auto_polling_mode; };
 	static bool setFocusMode(uint32_t node)
 	{
 		focus_node = node;
@@ -354,12 +356,7 @@ public:
 	static bool addApiPacket(const char *asciiCommand) { return addApiPacketLowPriority(asciiCommand); };
 	static bool addApiPacket(String asciiCommand) { return addApiPacketLowPriority(asciiCommand); };
 	static bool addApiPacket(uint8_t *buffer, int size) { return addApiPacketLowPriority(buffer, size); };
-
-
-	//------------------------------------------------
-	// all content of payload will be append to a broadcast api frame,
-	// size of packet will be set accordingly
-	static bool addBroadcastPacket(apiframe payload, bool prior_lvl=false);
+	;
 
 	static bool isMessageStackEmpty() { return !(lowPriorityFifoCommandList.size() + highPriorityFifoCommandList.size()); };
 	static apiframe checkNextPacketToSend() { return lowPriorityFifoCommandList.front(); };

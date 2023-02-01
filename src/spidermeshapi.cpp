@@ -123,7 +123,7 @@ bool SpidermeshApi::init()
 
     smkport.begin(PORTIA_BAUDRATE, SERIAL_8N1, RX_PORTIA, TX_PORTIA);
     pinMatrixInAttach(33, 199, false);
-    smkport.setPins(RX_PORTIA,TX_PORTIA,CTS_PORTIA,-1);
+    smkport.setPins(RX_PORTIA,TX_PORTIA,CTS_PORTIA, -1);
     smkport.setHwFlowCtrlMode(HW_FLOWCTRL_CTS);
 
 
@@ -706,7 +706,7 @@ void SpidermeshApi::CheckIfAnswerWasExpectedAndCallSuccessFunction(apiframe rxPk
             //if packet is local
             if(rxPkt[3] != PACKET_REMOTE_ANSWER)
             {
-                if((i->_request[3] | 0x10) == rxPkt[3])
+                if((i->_packet_type | 0x10) == rxPkt[3])
                 {
                     #if SHOW_EXPECT_EVENT
                         Serial.println(" = expect local match found ");
@@ -722,7 +722,7 @@ void SpidermeshApi::CheckIfAnswerWasExpectedAndCallSuccessFunction(apiframe rxPk
             }
             //since it is remote check the remote packet type futher
             
-            else if((i->_request[5] | 0x10) == (rxPkt[6]))
+            else if((i->_packet_type | 0x10) == (rxPkt[6] & 0x7F))
             {
               #if SHOW_EXPECT_EVENT
                 Serial.println("  = remote packet match");
@@ -904,7 +904,7 @@ void SpidermeshApi::automaticNodePolling()
             Serial.println("time based polling mode");
           #endif          
             
-            if(seconds - pCurrentNode->second.elapse_time >= pCurrentNode->second.sample_rate && isnt_already_in_expect_list)
+            if(seconds - pCurrentNode->second.elapse_time >= pCurrentNode->second.sample_rate)
             {
                 //must_increase_polling_iterator = true;
                 findNext();
@@ -1005,11 +1005,11 @@ bool SpidermeshApi::enableAutomaticPolling(String mode,String mac, uint16_t dura
     {
         
         polling_mode = mode; //default mode
-        setAutoPolling(true);
+        setAutoPollingNodeMode(true);
     }
     else if (mode == "disabled" || readFile("pollingMode") == "disabled")
     {
-        setAutoPolling(false);
+        setAutoPollingNodeMode(false);
     }
     return ret;
 }
@@ -1072,28 +1072,3 @@ bool SpidermeshApi::findNext(bool onlyRemote, bool initSearch)
 
 	return ret;
 }
-
-
-bool SpidermeshApi::addBroadcastPacket(apiframe payload, bool prior_lvl)
-{
-    apiframe pkt2add = {0xFB,0x00,0x00,0x0C,0x00,0x4E};
-
-    int len = payload.size() + 3;
-    pkt2add[1] = len & 0xFF;
-    pkt2add[2] = (len>>8) & 0xFF;		
-
-    for(auto b:payload) pkt2add.push_back(b);
-
-    if(show_apipkt_out)
-        printApiPacket(pkt2add, PREFIX_OUT);
-
-    if (prior_lvl)
-    {
-        addApiPacketHighPriority(pkt2add);
-        return true;
-    }
-    else
-        addApiPacketLowPriority(pkt2add);
-    return false;
-};
-

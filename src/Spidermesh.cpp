@@ -72,12 +72,12 @@ void Spidermesh::smkGatewayTaskCore(void *pvParameters)
 
     setMode(INIT_SMK900);
     setState(INIT_GATEWAY_REGISTER);
-    setOtaTimeout(10000);
+    setOtaTimeout(60000);
 
 
 	String mode = getPollingMode();
 	if (mode == "time" || mode == "fast")
-		setAutoPolling(true);
+		setAutoPollingNodeMode(true);
 
 	while (true)
 	{
@@ -401,7 +401,7 @@ bool Spidermesh::ProcessState(bool eob)
 		ret = false;
 
         bool have_send_packet = sendNextPacketBuffered();
-		if(isAutoPolling() && !have_send_packet && isMode(READY))
+		if(isAutoPollingNodeEnabled() && !have_send_packet && isMode(READY))
 		{
 			if(eob)automaticNodePolling();
 			//delay(5);
@@ -413,45 +413,47 @@ bool Spidermesh::ProcessState(bool eob)
 		PRTLN("\n--> CHECK_FILE_AND_LOAD_IF_AVAILABLE");
 		
 
-		setMode(UPDATE_NODES);
-		setState(STOP);
-		setAutoPolling(false);
-		otaResult = "start at " + getTimeFormated();
-
-		if (!firmware.open(firmware.filename))
+		if (1)
 		{
-			PRTLN("Cannont open file");
-			setState(IDLE);
-			return false;
-		}
-		firmware.close();
+			setMode(UPDATE_NODES);
+			setState(STOP);
+			setAutoPollingNodeMode(false);
+			otaResult = "start at " + getTimeFormated();
 
-		if (!firmware.validationUf2Integrity())
-		{
-			PRTLN("UF2 file is corrupted");
-			return false;
-		}
+			if (!firmware.open(firmware.filename))
+			{
+				PRTLN("Cannont open file");
+				setState(IDLE);
+				return false;
+			}
+			firmware.close();
 
-		firmware.calculOfEstimatedTime(getNumberOfNodeToUpdate());
-		setOtaTimeout(600000);
+			if (!firmware.validationUf2Integrity())
+			{
+				PRTLN("UF2 file is corrupted");
+				return false;
+			}
 
-		setState(INIT_GATEWAY_REGISTER);
-		logJson("UF2 OK");
-		requiredMeshSpeed.rf_speed = PRESET_72B;
-		requiredMeshSpeed.duty = 5;
+			firmware.calculOfEstimatedTime(getNumberOfNodeToUpdate());
+			setOtaTimeout(600000);
+
+			setState(INIT_GATEWAY_REGISTER);
+			logJson("UF2 OK");
+			requiredMeshSpeed.rf_speed = PRESET_72B;
+			requiredMeshSpeed.duty = 5;
 
 /*
-		if (firmware.getType() == SMK900)
-			setState(INIT_GATEWAY_REGISTER);
-		else if (firmware.getType() == PYBOARD)
-			setState(SLOW_DYN_FOR_SIM_BUTTON);
-		else if (firmware.getType() == EVM)
-			setState(INIT_GATEWAY_REGISTER);
-		setOtaTimeout(10000);
+			if (firmware.getType() == SMK900)
+				setState(INIT_GATEWAY_REGISTER);
+			else if (firmware.getType() == PYBOARD)
+				setState(SLOW_DYN_FOR_SIM_BUTTON);
+			else if (firmware.getType() == EVM)
+				setState(INIT_GATEWAY_REGISTER);
+			setOtaTimeout(10000);
 */
 
-		dumpReceivedBuffer();
-
+			dumpReceivedBuffer();
+		}
 	}
 	else if (isState(INIT_GATEWAY_REGISTER))
 	{
@@ -467,7 +469,7 @@ bool Spidermesh::ProcessState(bool eob)
 		// void (*cc)(const mesh_t::iterator pNode, bool success);
 		// https://www.learncpp.com/cpp-tutorial/lambda-captures/
 
-		setOtaTimeout(50000);
+		setOtaTimeout(60000);
 		apiframe cmd1 = apiPacket(SMK_WRITE_REG, {0x00, 17, 0x01, 0x01}, LOCAL);
 
 		//mesh_t gateway_boot;
@@ -558,7 +560,7 @@ bool Spidermesh::ProcessState(bool eob)
 
 		PRTLN("\n--> GET_SPEED_DYN");
 		log[String(millis())] = "GET_SPEED_DYN";
-		setOtaTimeout(50000);
+		setOtaTimeout(60000);
 
 		// apiframe cmd = apiPacket({0x03, 0x01, 0x02, 0x06}); // ret reg 2 DYN
 		apiframe cmd = apiPacket(SMK_READ_REG, {0x00, 2, 6}, LOCAL);
@@ -604,7 +606,7 @@ bool Spidermesh::ProcessState(bool eob)
 			PRTLN("\n--> SET_SPEED_DYN");
 			log[String(millis())] = "SET_SPEED_DYN";
 			//pCurrentNode->second.otaStep = STEP_WAIT;
-			setOtaTimeout(50000);
+			setOtaTimeout(60000);
 
 			uint8_t h = readFile("/hops").toInt();
 			if (h == 0)

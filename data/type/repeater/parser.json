@@ -1,0 +1,11 @@
+{
+  "parser":
+  {
+    "status":{
+      "params":{
+        "rssi":{"pos":[0,8]},
+        "volt":{"pos":[8,8]}
+      }
+    }
+  }
+}
