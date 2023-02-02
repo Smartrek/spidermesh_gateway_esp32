@@ -676,7 +676,7 @@ void SpidermeshApi::WriteAndExpectAnwser(  mesh_t::iterator pNode,
     }
     #if SHOW_EXPECT_EVENT
     #endif
-    else  PRTLN("Already in Expected list");
+    else if(nodes.pool.size() >=3)  PRTLN("Already in Expected list");
 }
 //void SpidermeshApi::
 
@@ -848,16 +848,6 @@ void SpidermeshApi::automaticNodePolling()
         mesh_t::iterator pPoll = nodes.pool.end();
 
         unsigned long seconds = millis()/1000;
-
-        //check if the node to poll is already in the list expected to avoid multiple retry of the same node
-        bool isnt_already_in_expect_list = true;
-        for(auto x : listOfExpectedAnswer) {
-            if(x._pNode->first == pCurrentNode->first)
-            {
-                isnt_already_in_expect_list = false;
-                break;
-            }
-        } 
 
         if(focus_node != 0)
         {
