@@ -63,8 +63,12 @@ typedef std::list<apiframe> listPacket_t;
 #define NB_PACKET_TERMINAL 15
 
 
+//hop table specs
+#define HOPTABLE_50K_START 0
+#define HOPTABLE_50K_COUNT 6
 
-
+//nwk max count
+#define NWK_COUNT 8
 
 #define SMK_SOFT_RESET			0x02
 #define SMK_READ_REG			0x03
@@ -125,7 +129,7 @@ typedef struct
 #define SHOW_SMK900_INIT true
 
 #define NB_EOB_SMK900
-#define NB_EOB_PYBOARD
+#define NB_EOB_HOST
 
 class ExpectAnswer
 {
@@ -133,8 +137,6 @@ public:
 	mesh_t::iterator _pNode;
 	uint8_t _packet_type;
 	bool _local;
-	uint8_t _nb_eob_recv;
-	uint8_t _max_nb_eob_recv;
 	uint8_t _eob_cnt;
 	int16_t _size;
 	ExpectCallback _expect_callback;
@@ -146,14 +148,12 @@ public:
 	ExpectAnswer(){};
 	ExpectAnswer(mesh_t::iterator pNode, uint8_t packet_type, apiframe request, ExpectCallback expect_callback, String tag = "", uint8_t max_retry = 0, apiframe expectPayload = {}, int16_t size = -1)
 	{
-		init(pNode, packet_type, request, expect_callback, tag, max_retry, expectPayload, size);
+		init(pNode, packet_type, request, expect_callback, tag, expectPayload, size);
 	};
-	void init(mesh_t::iterator pNode, uint8_t packet_type, apiframe request, ExpectCallback expect_callback, String tag = "", uint8_t max_retry = 0, apiframe expectPayload = {}, int16_t size = -1)
+	void init(mesh_t::iterator pNode, uint8_t packet_type, apiframe request, ExpectCallback expect_callback, String tag = "", apiframe expectPayload = {}, int16_t size = -1)
 	{
 		_pNode = pNode;
 		_packet_type = packet_type;
-		_nb_eob_recv = 0;
-		_max_nb_eob_recv = max_retry;
 		_eob_cnt = 0;
 
 		_expect_callback = expect_callback;
@@ -275,6 +275,7 @@ public:
 
 protected:
 	static int eob_cnt;
+	static byte channel_rf;
 
 public:
 

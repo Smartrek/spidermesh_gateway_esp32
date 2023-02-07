@@ -31,6 +31,7 @@ uint16_t SpidermeshApi::length_packet;
 unsigned char SpidermeshApi::idx_buf;
 
 int SpidermeshApi::eob_cnt;
+byte SpidermeshApi::channel_rf;
 firmware_t SpidermeshApi::firmware;
 
 apiframe SpidermeshApi::current_packet;
@@ -674,9 +675,6 @@ void SpidermeshApi::WriteAndExpectAnwser(  mesh_t::iterator pNode,
         }
         else PRTLN("MAX_EXPECT_LIST reached");
     }
-    #if SHOW_EXPECT_EVENT
-    #endif
-    else if(nodes.pool.size() >=3)  PRTLN("Already in Expected list");
 }
 //void SpidermeshApi::
 
@@ -792,35 +790,22 @@ void SpidermeshApi::CheckExpectTimeout()
 
         while (i != listOfExpectedAnswer.end())
         {
+            //if timeout, when eob more than 2 is considered timeout
             if( (++i->_eob_cnt) >2)
             {
                 //Serial.println("Expect failed, reach max EOB");
                 i->_eob_cnt=0;
-                i->_nb_eob_recv++;
 
                 //retry if less than max allowed and data was valid last time
                 //we don't want to retry if it was already dead and waste time here
-              #if SHOW_EXPECT_EVENT
-                Serial.println("  retry count is:" + String(i->_nb_eob_recv));
-              #endif
-                if(i->_nb_eob_recv > i->_max_nb_eob_recv)
-                {
-                    apiframe dummy;
-                  #if SHOW_EXPECT_EVENT
-                    Serial.println("  data validity FALSE <---- " + i->_pNode->second.name);
-                  #endif
-                     i->_pNode->second.dataValid=false;
-                    i->_expect_callback(i->_pNode, dummy, false, i->_tag);//if user want to do something
+                apiframe dummy = {};
+                #if SHOW_EXPECT_EVENT
+                Serial.println("  data validity FALSE <---- " + i->_pNode->second.name);
+                #endif
+                    i->_pNode->second.dataValid=false;
+                i->_expect_callback(i->_pNode, dummy, false, i->_tag);//if user want to do something
 
-                    i=listOfExpectedAnswer.erase(i);
-                }
-                else
-                {
-                    lowPriorityFifoCommandList.push_back(i->_request);
-                    #if SHOW_EXPECT_EVENT
-                    Serial.println( i->_pNode->second.name + " retry no: " + String(i->_nb_eob_recv) + " of " + String(i->_max_nb_eob_recv));
-                    #endif
-                }
+                i=listOfExpectedAnswer.erase(i);
             }
             //Serial.print("  expect list sz:");
             //Serial.println(listOfExpectedAnswer.size());
@@ -942,17 +927,15 @@ void SpidermeshApi::automaticNodePolling()
             byte sz = 6 + rqt_status.size();
             smkPacket = {0xFB, sz, 0, 0x0C, 0x00, PACKET_VM_REQUEST};
 
-            smkPacket.push_back(pPoll->second.mac.bOff[byte0]);
-            smkPacket.push_back(pPoll->second.mac.bOff[byte1]);
-            smkPacket.push_back(pPoll->second.mac.bOff[byte2]);
+            smkPacket.push_back(pPoll->second.mac.bOff[0]);
+            smkPacket.push_back(pPoll->second.mac.bOff[1]);
+            smkPacket.push_back(pPoll->second.mac.bOff[2]);
 
             //add custom payload from json file if available
             for(auto c : rqt_status) smkPacket.push_back(c);        
             
-            #if SHOW_TRANSMITED_PACKET_TO_SMK900 || SHOW_AUTOMATIC_POLLING
-            printApiPacket(smkPacket, "out: ");
-            #endif
-            
+            if(show_apipkt_out)
+                printApiPacket(smkPacket, "  out: ");
             //write the polling command 
 
             WriteAndExpectAnwser(pPoll, smkPacket, 0x0E, "status", cbAutomaticPolling);

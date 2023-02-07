@@ -55,7 +55,7 @@ enum firmware_type_t
     SMK900,
     EVM,
     JVM,
-    PYBOARD
+    HOST
 };
 union uf2_block_t
 {
@@ -367,7 +367,7 @@ public:
 
 #define MAGICWORD_SMK900 0x42424242
 #define MAGICWORD_EVM 0x38335155
-#define MAGICWORD_PYBOARD 0x64646464
+#define MAGICWORD_HOST 0x64646464
 
         if (magic_word.uint32b == MAGICWORD_SMK900)
         {
@@ -379,10 +379,10 @@ public:
             type = EVM;
             //Serial.println("EVM");
         }
-        else if (magic_word.uint32b == MAGICWORD_PYBOARD)
+        else if (magic_word.uint32b == MAGICWORD_HOST)
         {
-            type = PYBOARD;
-            //Serial.println("PYBOARD");
+            type = HOST;
+            //Serial.println("HOST");
         }
         return type;
     };
@@ -397,10 +397,10 @@ public:
         int t = getType();
         return (t == EVM) ? true : false;
     };
-    bool isPyboard()
+    bool isHost()
     {
         int t = getType();
-        return (t == PYBOARD) ? true : false;
+        return (t == HOST) ? true : false;
     };
 
     void calculOfEstimatedTime(int32_t nbToUpdate)
@@ -410,7 +410,7 @@ public:
         Serial.print("  Number of node to update: ");
         Serial.println(nbToUpdate);
 
-        if (getType() == PYBOARD)
+        if (getType() == HOST)
             max_progress += nbToUpdate + 1;  // reset factory
         max_progress += nbToUpdate * 8;      // read version
         max_progress += nbToUpdate + 1;      // prime
@@ -424,7 +424,7 @@ public:
         max_progress += nbToUpdate * 4 + 1;                       // RESET_ON_SEEK
         max_progress += nbToUpdate + 1;                           // SEND MAGIC WORD
         progress_per_step.push_back(max_progress);
-        if (getType() == PYBOARD)
+        if (getType() == HOST)
         {
             max_progress += nbBlock.uint32b * 4 + 1; // potia -> pyboard
             progress_per_step.push_back(max_progress);

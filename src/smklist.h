@@ -68,13 +68,13 @@ public:
 	};
 };
 
-class FirmwarePyboard
+class FirmwareHost
 {
 public:
 	uint16_t version;
 	uint16_t sub_version;
 
-	FirmwarePyboard() { clear(); };
+	FirmwareHost() { clear(); };
 	void clear()
 	{
 		version = 0;
@@ -128,8 +128,8 @@ public:
 	FirmwareVersion old_firmware;
 	FirmwareVersion new_firmware;
 
-	FirmwarePyboard old_firmware_pyboard;
-	FirmwarePyboard new_firmware_pyboard;
+	FirmwareHost old_firmware_pyboard;
+	FirmwareHost new_firmware_pyboard;
 	String getMacAsString()	{ 	return String(mac.bOff[3]) + "." + String(mac.bOff[2]) + "." + String(mac.bOff[1]) + "." + String(mac.bOff[0]);	};
 
 #if MODBUS_REGISTER_ENABLED
