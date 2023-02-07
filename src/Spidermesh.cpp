@@ -56,7 +56,8 @@ void Spidermesh::begin(int hop, int duty, int rf_speed, uint64_t timeout)
 		1);		/* core # (0-1) arduino loop fn is on core 1 */ 
 
 	auto timeout_end = millis() + timeout;
-	if(timeout) while(!isReady() && millis() < timeout_end)  delay(100);
+
+	while(!isReady() && millis() < timeout_end)  delay(100);
 }
 
 
@@ -395,7 +396,7 @@ void Spidermesh::logJson(String msg)
  * @return true 
  * @return false 
  */
-bool Spidermesh::setChannelSequence(int channel)
+bool Spidermesh::setChannelSequence(int channel, uint64_t timeout)
 {
 	bool ch_ok = false;
 
@@ -407,8 +408,12 @@ bool Spidermesh::setChannelSequence(int channel)
 		channel_rf = channel;		
 		setMode(CONFIG_SMK900);
 		setState(SET_CHANNEL_RF);
+
+		uint64_t timeout_end = millis();
+		while(!isReady() && millis() < timeout_end) delay(100);
 	}
 	else PRTLN("** error: channel invalide");
+
 	return ch_ok;	
 }
 

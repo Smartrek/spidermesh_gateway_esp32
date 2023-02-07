@@ -24,7 +24,10 @@ Spidermesh smk900;
 
 ## Basic functions
 ### begin
-You can define the speed of the Spidermesh network with this function. For more detail about paramters of Spidermesh, see https://www.smartrek.io/download/SMK900_Portia_Summary_V6.pdf
+You can define the speed of the Spidermesh network with this function. This function is waiting until the full sequence is done. 
+You can add a 4th parameter to specified a timeout. There is a 10min default timeout for this function. 
+For more detail about parameters of Spidermesh, see https://www.smartrek.io/download/SMK900_Portia_Summary_V6.pdf
+
 ```c++
 int nb_hops = 8;
 int duty_cycle = 5;
@@ -43,8 +46,9 @@ smk900.enableAutomaticPolling();
 ### setChannelSequence
 
 To change channel of the mesh network, use this function to launch the sequence needed to perform this action. 
-Note that a reset and a write to eeprom will be perform ,so use this function only when needed. Do not use by default in the setup
-
+Note that a reset and a write to eeprom will be perform ,so use this function only when needed. Do not use by default in the setup.
+Channel go from 1 to 16.
+You can add a 2th parameter to specified a timeout. There is a 10min default timeout for this function. 
 ```c++
 smk900.setChannelSequence(1)
 ```

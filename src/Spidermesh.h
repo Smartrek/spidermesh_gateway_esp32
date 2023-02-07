@@ -2,7 +2,7 @@
 #ifndef SPIDERMESH
 #define SPIDERMESH
 
-
+#define DEFAULT_TIMEOUT 600000
 
 
 #define SKIP_NODE_WHEN_MISSING_PAGE_OLD_VERSION false
@@ -38,31 +38,8 @@
 
 
 #define EXPECTED_PRESET_RF_AT_BOOT PRESET_20B
-
-
-
-/*
-#ifdef SIMULATION == SIMULATION_END
-    #define SIMULATION_BULKUPLOAD               false
-    #define SIMULATION_GETMISSINGFLAGS          false
-    #define SIMULATION_PRUNE_VALID_PAGES    false
-    #define SIMULATION_CHECK_IF_CRC_OK          false
-    #define SIMULATION_SEND_META_DATA           false
-    #define SIMULATION_RESET_NODE_ON_SEEK       true
-    #define SIMULATION_SEND_MAGICWORD           true
-
-#endif
-*/
-
-
-
-
-
-
-
-
-
 #include "spidermeshapi.h"
+
 
 
 class mesh_step_t
@@ -218,7 +195,7 @@ class Spidermesh : public SpidermeshApi
 
 
 public:
-	void begin(int hop=-1, int duty=-1, int rf_speed=-1, uint64_t timeout = 600000);	
+	void begin(int hop=-1, int duty=-1, int rf_speed=-1, uint64_t timeout = DEFAULT_TIMEOUT);	
     static void task();
     static bool findNextNode(bool initSearch=false, bool otaActiveOnly=false);
     static void init();
@@ -292,7 +269,7 @@ public:
 	static void setCallbackLoadExternalParamFiles(std::function<void()> fn){cbLoadExternalParamFiles=fn;};
 
 
-	static bool setChannelSequence(int channel);
+	static bool setChannelSequence(int channel, uint64_t timeout=DEFAULT_TIMEOUT);
 };
 
 
