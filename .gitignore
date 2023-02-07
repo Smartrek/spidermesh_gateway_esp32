@@ -1,5 +1,5 @@
 .vscode/
 lib/
 .pio/
-convert2arduinolib.sh
-convert2platformio.sh
+src/main.cpp
+*.sh

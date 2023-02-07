@@ -106,6 +106,7 @@ enum ota_state
 {
 	NONE,							  /* */
 	IDLE,							  /* */
+	RESET,
 	CHECK_FILE_AND_LOAD_IF_AVAILABLE, /* calc length*/
 
 	/* Depending of the mode, it can go elswhere at the end of this sequence  */
@@ -217,11 +218,12 @@ class Spidermesh : public SpidermeshApi
 
 
 public:
-	void begin(int hop=-1, int duty=-1, int rf_speed=-1);	
+	void begin(int hop=-1, int duty=-1, int rf_speed=-1, uint64_t timeout = 600000);	
     static void task();
     static bool findNextNode(bool initSearch=false, bool otaActiveOnly=false);
     static void init();
    	static bool isInitDone() { return initDone; };
+	static bool isReady();
 	static bool currentNodeCanBePolled(){return ((pCurrentNode->second.otaStep == STEP_INIT) || (pCurrentNode->second.otaStep == STEP_COMPLETED) || (pCurrentNode->second.otaStep == STEP_FAILED) || (pCurrentNode->second.otaStep == STEP_RETRY) || (pCurrentNode->second.otaStep == STEP_TRANSFERT));};
 
 

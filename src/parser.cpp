@@ -18,8 +18,6 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 	{
 		#if SHOW_DEBUG_EXTRACT_DATA
 		Serial.print("  default status key is founded");
-		#else
-		Serial.print("r");
 		#endif
 
 	}

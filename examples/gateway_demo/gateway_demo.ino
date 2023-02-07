@@ -32,7 +32,7 @@
 #define TEST_AUTOMATIC_NODE_POLLING
 //#define TEST_REQUEST_BUILDER
 //#define TEST_UNICAST_TO_NODE
-#define TEST_BROADCAST_TO_ALL_NODE
+//#define TEST_BROADCAST_TO_ALL_NODE
 //#define TEST_OTA_UPDATE
 //#define TEST_LOAD_EXTERNAL_FILES_DEFINITION
 
@@ -56,31 +56,32 @@ void CallbackAutoPolling(mesh_t::iterator pNode, apiframe packet, bool success, 
 {
 	//in case was unable to reach node, action can be done here
 	//payload contain nothing if unable to reach node
+
 	if(!success) 
 	{
 		Serial.print("Timeout: Unable to reach node: ");
 		Serial.println(pNode->second.getMacAsString());
-		return; //we quit here
 	}
-	//to know who trigger the callback	and what is his type	
-	String node_mac = pNode->second.getMacAsString();
-	Serial.printf("Response from MAC:  %s\n", node_mac.c_str());
-	Serial.printf("Type: %s\n", pNode->second.type.c_str());
-	printApiPacket(packet, "in: ");
-	Serial.printf("Tag: %s\n", tag);
-
-	//conversion of individual data from rf payload into JSON variables
-	DynamicJsonDocument reply_json_doc(5000);
-	JsonVariant reply_json = reply_json_doc.as<JsonVariant>();
-	if(SmkParser::rfPayloadToJson(packet, tag, reply_json, pNode->second.type))
+	else
 	{
-		Serial.printf("tag: %s\n", tag.c_str());
+		//to know who trigger the callback	and what is his type	
+		String node_mac = pNode->second.getMacAsString();
+		Serial.printf("Response from MAC:  %s\n", node_mac.c_str());
+		Serial.printf("Type: %s\n", pNode->second.type.c_str());
+		Serial.printf("Tag: %s\n", tag);
 
-		String prettyjson="";
-		Serial.println("payload:");
-		serializeJsonPretty(reply_json, prettyjson);
-		Serial.println(prettyjson);
+		//conversion of individual data from rf payload into JSON variables
+		DynamicJsonDocument reply_json_doc(5000);
+		JsonVariant reply_json = reply_json_doc.as<JsonVariant>();
+		if(SmkParser::rfPayloadToJson(packet, tag, reply_json, pNode->second.type))
+		{
+			String prettyjson="";
+			Serial.println("payload:");
+			serializeJsonPretty(reply_json, prettyjson);
+			Serial.println(prettyjson);
+		}
 	}
+	Serial.print("_____________________________________________\n\n");
 }
 
 #ifdef TEST_REQUEST_BUILDER
@@ -130,7 +131,7 @@ void setup()
 	initDrive();
 
 	//set the mesh network speed at those parameters
-	int nb_hops = 8;
+	int nb_hops = 14;
 	int duty_cycle = 5;
 	int nb_byte_per_packet = 20;
 
@@ -164,7 +165,9 @@ void setup()
 	//radio will have already started to synch nodes at this point, but at the speed of mesh saved in eeprom
 	smk900.begin(nb_hops,duty_cycle,nb_byte_per_packet);
 
-
+	//if there is a need to change channel, use this function to launch the sequence
+	//note that a reset and a write to eeprom will be perform so use this function only when needed, do not use by default
+	//smk900.setChannelSequence(1);
 }
 
 uint64_t last_broadcast=millis();
@@ -209,7 +212,7 @@ void loop()
 	//broadcast to all node variable 1 every 15min, will be sent at the next available broadcast cycle
 	if(millis()-last_broadcast > 15000){
 		Serial.println("Broadcast message");
-		smk900.addBroadcastPacket({0x01,0x02,0x03}); 
+		smk900.addApiPacket({0x0C,0x00,0x4E,0x01}); 
 		last_broadcast = millis();
 	}
 	#endif

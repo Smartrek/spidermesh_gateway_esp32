@@ -40,6 +40,15 @@ When smk900.cbAutomaticPolling have been define, call this function to enable th
 smk900.enableAutomaticPolling();
 ```
 
+### setChannelSequence
+
+To change channel of the mesh network, use this function to launch the sequence needed to perform this action. 
+Note that a reset and a write to eeprom will be perform ,so use this function only when needed. Do not use by default in the setup
+
+```c++
+smk900.setChannelSequence(1)
+```
+
 ## Callback functions
 
 Use those function to set the callback describe bellow

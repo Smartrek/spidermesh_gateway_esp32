@@ -34,7 +34,7 @@ int Spidermesh::sim_skip_first_packet;
 std::function<void()> Spidermesh::cbLoadExternalParamFiles;
 
 
-void Spidermesh::begin(int hop, int duty, int rf_speed)
+void Spidermesh::begin(int hop, int duty, int rf_speed, uint64_t timeout)
 {
 
     if(hop>=5 && hop<31) requiredMeshSpeed.hop = hop;
@@ -54,6 +54,9 @@ void Spidermesh::begin(int hop, int duty, int rf_speed)
 		1,		/* priority */
 		&Task1, /*  */
 		1);		/* core # (0-1) arduino loop fn is on core 1 */ 
+
+	auto timeout_end = millis() + timeout;
+	if(timeout) while(!isReady() && millis() < timeout_end)  delay(100);
 }
 
 
@@ -98,8 +101,7 @@ void Spidermesh::task()
         setMode(INIT_SMK900);
         setState(INIT_GATEWAY_REGISTER);
         setOtaTimeout(10000);        
-    }    
-	
+    }
   #endif //WATCHDOG_SMK900_ENABLE	
 }
 
@@ -147,6 +149,11 @@ void Spidermesh::setState(ota_state new_state, ota_state following_step)
 	eob_cnt = 0;
 	step_start_time = millis();
 };
+
+bool Spidermesh::isReady()
+{
+	return (isMode(READY) && isState(IDLE));
+}
 
 #ifdef WATCHDOG_SMK900_ENABLE
 void Spidermesh::interruptResetPortia()
@@ -435,6 +442,31 @@ bool Spidermesh::ProcessState(bool eob)
 		}		
 	}
 
+	else if (isState(RESET))
+	{
+		if (eob_cnt == 2 && eob)
+		{
+			apiframe cmd = apiPacket(SMK_SOFT_RESET, {0}, LOCAL); // reg preset from ram
+
+			WriteAndExpectAnwser(gateway, cmd, 0x12, "reset", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
+			{
+                //TIMEOUT
+                if(!success) {
+					setMode(WAITING);
+					setState(STOP);
+                    pNode->second.otaStep = STEP_FAILED;
+                    PRTLN("  Unable to reset smk900"); 
+					reset();
+					return; 
+                }
+
+				setState(next_state);
+                //SUCESS
+				PRTLN("  Reset successful");
+            }));
+			ret = true;
+		}
+	}
 	else if (isState(CHECK_FILE_AND_LOAD_IF_AVAILABLE))
 	{
 		PRTLN("\n--> CHECK_FILE_AND_LOAD_IF_AVAILABLE");
@@ -471,10 +503,10 @@ bool Spidermesh::ProcessState(bool eob)
 	else if (isState(INIT_GATEWAY_REGISTER))
 	{
 	#if SHOW_SMK900_INIT
-		Serial.println("--> Init Smk900 Register");
+		Serial.println("--> INIT_GATEWAY_REGISTER");
 	#endif
 		setState(INIT_GATEWAY_REGISTER_WAIT_DONE);
-		log[String(millis())] = "INIT portia";
+		log[String(millis())] = "INIT smk900";
 
 		// set gateway mac as unavailable
 		gatewayMacAddressIsReceived = false;
@@ -494,7 +526,7 @@ bool Spidermesh::ProcessState(bool eob)
             if(!success) { Serial.println(" Error: Unable to set EOB flag"); return; }
 
 	#if SHOW_SMK900_INIT
-            Serial.println(pNode->second.name + " EOB flag enabled");
+            Serial.println("  EOB flag enabled");
 	#endif
 
             //uint8_t uart_setting[10] = {0x0E, 0,0,0,0,0,100,0};
@@ -505,7 +537,7 @@ bool Spidermesh::ProcessState(bool eob)
             WriteAndExpectAnwser(gateway_boot.begin(), cmd2,0x14,  "init", ExpectCallback([](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void {
                 if(!success) { return; }
 	#if SHOW_SMK900_INIT
-                Serial.println(pNode->second.name + " reg 34 writen");
+                Serial.println(pNode->second.name + "  Gateway sleep mode enabled");
 	#endif
 				//log[String(millis())] = "EOB written";
             
@@ -515,7 +547,7 @@ bool Spidermesh::ProcessState(bool eob)
                 WriteAndExpectAnwser(gateway_boot.begin(), cmd3, 0x1B,  "init", ExpectCallback([](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void {
                     if(!success) { Serial.println(" Node " + pNode->second.name + " is unavailable."); return; }
 	#if SHOW_SMK900_INIT
-                        Serial.println(pNode->second.name + " transfert to RAM");
+                        Serial.println(pNode->second.name + "  Transfert to RAM");
 	#endif
 
                         //apiframe cmd5 = requestMacAddress();
@@ -560,7 +592,6 @@ bool Spidermesh::ProcessState(bool eob)
 	{
 		if(initDone)
 		{ 
-			Serial.print("init done");
 			setState(GET_SPEED_DYN);		
 			ret=true;
 		}
@@ -673,7 +704,7 @@ bool Spidermesh::ProcessState(bool eob)
 			apiframe cmd = apiPacket(SMK_READ_REG, {1, 11, 1}, LOCAL); // reg preset from ram
 
 			WriteAndExpectAnwser(gateway, cmd, 0x13, "getpreset", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
-																			{
+			{
                 //TIMEOUT
                 if(!success) {
                     pNode->second.otaStep = STEP_FAILED;
@@ -727,8 +758,7 @@ bool Spidermesh::ProcessState(bool eob)
                                 PRTLN("  Unable to save to EEPROM"); return; 
                             }
 
-                            reset();
-                            setState(TEST_SERIAL_COMM);
+                            setState(RESET,TEST_SERIAL_COMM);
                             PRTLN("  SAVE to EEPROM sucess");
 							log[String(millis())] = "SAVE to EEPROM";
                             setOtaTimeout(300000);
@@ -804,7 +834,7 @@ bool Spidermesh::ProcessState(bool eob)
 				PRTLN("  Unable to set channel"); return; 
 			}
 			//SUCESS
-			PRTLN("\n  Set Network ID Done");
+			PRTLN("  Set Network ID Done");
 			byte htable=  HOPTABLE_50K_START + (channel_rf-1)%HOPTABLE_50K_COUNT;
 			apiframe cmd = apiPacket(SMK_WRITE_REG, {0, 4, 1, htable}, LOCAL);
 			WriteAndExpectAnwser(gateway, cmd, 0x14, "sethoptable",ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
@@ -817,7 +847,7 @@ bool Spidermesh::ProcessState(bool eob)
 
 
 				//SUCESS
-				PRTLN("\n  Set Hop Table Done");
+				PRTLN("  Set Hop Table Done");
 				//apiframe cmd = apiPacket({0x0B, 2});
 				apiframe cmd = apiPacket(SMK_TRANSFERT_MEM, {2}, LOCAL);
 				WriteAndExpectAnwser(gateway, cmd, 0x1B, "write channel", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void 
@@ -832,11 +862,10 @@ bool Spidermesh::ProcessState(bool eob)
 					}
 					else
 					{
-						reset();
 						PRTLN("  SAVE to EEPROM sucess");
 						log[String(millis())] = "SAVE to EEPROM";
 						setMode(INIT_SMK900);
-						setState(INIT_GATEWAY_REGISTER);
+						setState(RESET, INIT_GATEWAY_REGISTER);
 					}
 					setOtaTimeout(600000);
 				}));
