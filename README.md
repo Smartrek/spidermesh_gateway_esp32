@@ -8,10 +8,10 @@ This repository is a gateway state machine for the spidermesh network. It is pol
 ESP32 for now
 	
 ### important note
-CTS signal of uart was not supported on old version of arduino platform. This library was tested on Espressif 32 platform 5.1.1 and previous version may not work. There is work around but not as pretty as for this platform.  Since this project have been mainly tester using platformio, it will work only on the latest version of platformio. Effort will be done soon to make it compatible on arduino ide and older version as well.
+CTS signal of uart was not supported on old version of arduino platform. This library was tested on Espressif 32 platform 5.1.1 and previous version may not work. There is work around but not as pretty as for this platform. As for now, this project have been mainly tested using platformio, it will work only on the latest version of platformio. Effort will be done soon to make it compatible on arduino ide and older version as well.
 
 ## How to use the library
-Define the callback functions that are enumerated below as you see fit for your application. They are normally defined in the setup function. Then, a call the "enableAutomaticPolling()" function allow the polling of nodes defined. After all have been set, call the begin() function with the speed of the mesh as parameters.
+Define the callback functions that are enumerated below as you see fit for your application. They are normally defined in the setup function. Then, call the "enableAutomaticPolling()" function to allow the polling of nodes defined. After all have been set, call the begin() function with the speed of the mesh as parameters.
 
 In the loop function or inside callback function, if you want to make custom api call, you can call the addWriteExpect function. 
 
@@ -124,6 +124,30 @@ apiframe CallbackAutoRequestBuilder(mesh_t::iterator pNode)
 	apiframe request_packet={0x60};
 	return request_packet;
 }
+```
+
+### setCallbackLoadExternalParamFiles
+This function allow you to load the parameters files needed from an external source. This is particularely usefull to load a node list and node type for a server according to an unique identifier of the gateway. The MAC address of the gateway is a good unique identifier. MAC address of the ESP32 wifi or ethernet can also be use. Parameters file are in JSON.
+
+```c++
+smk900.setCallbackLoadExternalParamFiles(CallbackLoadExternalFileDefinition);
+
+void CallbackLoadExternalFileDefinition()
+{
+	String mac_gateway = smk900.gateway->second.getMacAsString();
+	Serial.print("Load list of gateway: ");
+	Serial.println(mac_gateway);
+
+	//--------------------------------------------------------
+	// example of loading nodes list available and the types, 
+	// it can be fetch from any kind database accessible with http or mqtt
+	// you can use the mac gateway to identify the list of nodes and types to fetch
+	smk900.nodes.loadNodes("{\"0.0.172.51\":{\"name\":\"Office1\",\"type\":\"vacuum\"},\"0.0.172.52\":{\"name\":\"Office2\",\"type\":\"vacuum\"},\"0.0.64.62\":{\"name\":\"Office3\",\"type\":\"vacuum\"}}");
+
+	//loading of all the type available
+	smk900.nodes.loadTypes("{\"vacuum\":{\"parser\":{\"status\":{\"params\":{\"rssi\":{\"pos\":[0,8]},\"vacuum\":{\"pos\":[8,16]},\"temperature\":{\"pos\":[24,8]},\"volt\":{\"pos\":[32,8]}}}}}}");
+}
+
 ```
 
 ### Unicast API call
