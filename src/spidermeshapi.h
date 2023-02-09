@@ -280,6 +280,7 @@ protected:
 public:
 
 	static String getPollingMode() { return readFile("/pollingMode"); };
+	static bool getAutoPolling() {return _auto_polling_mode;};
 	static bool enableAutomaticPolling(String mode="time", String mac = "", uint16_t duration = 15);
 
 
@@ -291,7 +292,7 @@ public:
 
 	static void task();
 	void pollNodeList();
-	static void setAutoPollingNodeMode(bool mode = true)
+	static void setAutoPolling(bool mode = true)
 	{
 		_auto_polling_mode = mode;
 	};

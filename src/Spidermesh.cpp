@@ -81,7 +81,7 @@ void Spidermesh::smkGatewayTaskCore(void *pvParameters)
 
 	String mode = getPollingMode();
 	if (mode == "time" || mode == "fast")
-		setAutoPollingNodeMode(true);
+		setAutoPolling(true);
 
 	while (true)
 	{
@@ -477,7 +477,7 @@ bool Spidermesh::ProcessState(bool eob)
 		PRTLN("\n--> CHECK_FILE_AND_LOAD_IF_AVAILABLE");
 		setMode(UPDATE_NODES);
 		setState(STOP);
-		setAutoPollingNodeMode(false);
+		setAutoPolling(false);
 		otaResult = "start at " + getTimeFormated();
 
 		if (!firmware.open(firmware.filename))

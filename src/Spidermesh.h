@@ -270,6 +270,8 @@ public:
 
 
 	static bool setChannelSequence(int channel, uint64_t timeout=DEFAULT_TIMEOUT);
+
+	
 };
 
 
