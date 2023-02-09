@@ -92,7 +92,7 @@ void Spidermesh::smkGatewayTaskCore(void *pvParameters)
 void Spidermesh::task()
 {
 	SpidermeshApi::task();
-    if(!ProcessState(false))delay(50);
+    ProcessState(false);
 
   #ifdef WATCHDOG_SMK900_ENABLE
     if(interruptResetPortiaFlag)
