@@ -252,18 +252,6 @@ void SpidermeshApi::task()
     //manage serial port reception
     if(!parseReceivedData()) delay(10);
 
-    //If the fifo is holding message
-    if(!isMessageStackEmpty())
-    {
-        
-        apiframe cmd = checkNextPacketToSend();
-        if(cmd.size() >3 )
-        {
-            //Serial.println("messge stack sent");
-            if(cmd[3] != PACKET_TXAIR_CMD_WRAPPER) _otaPacketInCycle = sendNextPacketBuffered();
-            //delay(50);
-        }
-    }
 
 }
 
@@ -529,8 +517,7 @@ bool SpidermeshApi::sendNextPacketBuffered()
             writeAndExpectList.pop_front();
             WriteAndExpectAnwser(req.pNode, req.payload, PACKET_VM_RESP, req.tag, req.callback);
         }
-        else 
-        
+
         ret = true;
     }
 

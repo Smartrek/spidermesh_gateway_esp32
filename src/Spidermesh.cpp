@@ -434,13 +434,25 @@ bool Spidermesh::ProcessState(bool eob)
 #endif
 	if (isState(IDLE))
 	{
-		// do nothing
-		ret = false;
-
-        bool have_send_packet = sendNextPacketBuffered();
-		if(isAutoPollingNodeEnabled() && !have_send_packet && isMode(READY))
+		//for local packet
+		bool specialRequestPacket;
+		if(!isMessageStackEmpty())
 		{
-			if(eob){
+			
+			apiframe cmd = checkNextPacketToSend();
+			if(cmd.size() >3 )
+			{
+				//Serial.println("messge stack sent");
+				if(cmd[3] != PACKET_TXAIR_CMD_WRAPPER) specialRequestPacket = sendNextPacketBuffered();
+				//delay(50);
+			}
+		}
+
+		//for remote packet
+		if(eob){
+			specialRequestPacket = sendNextPacketBuffered();
+			if(isAutoPollingNodeEnabled() && !specialRequestPacket && isMode(READY))
+			{
 				automaticNodePolling();
 				ret = true;
 			}
@@ -603,9 +615,7 @@ bool Spidermesh::ProcessState(bool eob)
 	}
 	else if (isState(GET_SPEED_DYN))
 	{
-		if (!eob
-		) // leave a delay otherwise bug
-			return false;
+		if (!eob) return false;
 
 		PRTLN("\n--> GET_SPEED_DYN");
 		log[String(millis())] = "GET_SPEED_DYN";

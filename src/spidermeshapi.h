@@ -362,7 +362,6 @@ public:
 
 	static bool isMessageStackEmpty() { return !(lowPriorityFifoCommandList.size() + highPriorityFifoCommandList.size()); };
 	static apiframe checkNextPacketToSend() { return lowPriorityFifoCommandList.front(); };
-	static bool isOtaPacketSendInThisCycle() { return _otaPacketInCycle; };
 	static bool isEobPacket(apiframe pkt)
 	{
 		if (pkt.size() > 3)
