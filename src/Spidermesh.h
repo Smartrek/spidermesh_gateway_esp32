@@ -83,6 +83,7 @@ enum ota_state
 {
 	NONE,							  /* */
 	IDLE,							  /* */
+	WAIT,
 	RESET,
 	CHECK_FILE_AND_LOAD_IF_AVAILABLE, /* calc length*/
 
@@ -198,6 +199,7 @@ public:
 	void begin(int hop=-1, int duty=-1, int rf_speed=-1, uint64_t timeout = DEFAULT_TIMEOUT);	
     static void task();
     static bool findNextNode(bool initSearch=false, bool otaActiveOnly=false);
+	static void debugStateMachine();
     static void init();
    	static bool isInitDone() { return initDone; };
 	static bool isReady();

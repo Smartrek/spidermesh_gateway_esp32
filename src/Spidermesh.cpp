@@ -55,9 +55,25 @@ void Spidermesh::begin(int hop, int duty, int rf_speed, uint64_t timeout)
 		&Task1, /*  */
 		1);		/* core # (0-1) arduino loop fn is on core 1 */ 
 
-	auto timeout_end = millis() + timeout;
 
-	while(!isReady() && millis() < timeout_end)  delay(100);
+
+		uint64_t timeout_end = millis()+timeout;
+		bool timeout_flag = false;
+
+
+		while(!isReady() && !timeout_flag) 
+		{
+			if(millis() > timeout_end)
+			{
+				timeout_flag = true;
+				Serial.println("--> TIMEOUT <--");
+			}
+			delay(100);
+		}
+		Serial.println("  smk900 begin done");
+
+
+
 }
 
 
@@ -349,7 +365,7 @@ bool Spidermesh::isDynOptimalUpdateSpeed()
 
 	uint8_t h = readFile("/hops").toInt();
 	if (h == 0)
-		h = 8;
+		h = 15;
 	uint8_t d = readFile("/duty").toInt();
 	if (d == 0)
 		d = 5;
@@ -365,18 +381,12 @@ bool Spidermesh::isDynOptimalUpdateSpeed()
 		ret = false;
 	}			
 
-	if (actualMeshSpeed.bo != 1)
-		ret = false;
-	if (actualMeshSpeed.bi != 1)
-		ret = false;
-	if (actualMeshSpeed.hop != h)
-		ret = false;
-	if (actualMeshSpeed.rd != 1)
-		ret = false;
-	if (actualMeshSpeed.rde != 0)
-		ret = false;
-	if (actualMeshSpeed.duty != d)
-		ret = false;
+	if (actualMeshSpeed.bo != 1) 	ret = false;
+	if (actualMeshSpeed.bi != 1) 	ret = false;
+	if (actualMeshSpeed.hop != h) 	ret = false;
+	if (actualMeshSpeed.rd != 1) 	ret = false;
+	if (actualMeshSpeed.rde != 0) 	ret = false;
+	if (actualMeshSpeed.duty != d) 	ret = false;
 
 	return ret;
 };    
@@ -409,12 +419,38 @@ bool Spidermesh::setChannelSequence(int channel, uint64_t timeout)
 		setMode(CONFIG_SMK900);
 		setState(SET_CHANNEL_RF);
 
-		uint64_t timeout_end = millis();
-		while(!isReady() && millis() < timeout_end) delay(100);
+		uint64_t timeout_end = millis()+timeout;
+		bool timeout_flag = false;
+
+
+		while(!isReady() && !timeout_flag) 
+		{
+			if(millis() > timeout_end)
+			{
+				timeout_flag = true;
+				Serial.println("--> TIMEOUT <--");
+			}
+			delay(100);
+		}
+		Serial.println("setChannelSequence out");
+		delay(1000);
 	}
 	else PRTLN("** error: channel invalide");
 
 	return ch_ok;	
+}
+
+void Spidermesh::debugStateMachine()
+{
+	Serial.println("\n\n---DEBUG STATE MACHINE---\n  LIST OF EXPECT ANSWER:");
+	for(auto i: listOfExpectedAnswer)
+	{
+		printApiPacket(i._request, "  exp:");
+	}
+	Serial.print("  total = ");
+	Serial.println(listOfExpectedAnswer.size());
+
+	Serial.println("\n");
 }
 
 
@@ -457,6 +493,10 @@ bool Spidermesh::ProcessState(bool eob)
 				ret = true;
 			}
 		}		
+	}
+	else if(isState(WAIT))
+	{
+
 	}
 
 	else if (isState(RESET))
@@ -615,8 +655,6 @@ bool Spidermesh::ProcessState(bool eob)
 	}
 	else if (isState(GET_SPEED_DYN))
 	{
-		if (!eob) return false;
-
 		PRTLN("\n--> GET_SPEED_DYN");
 		log[String(millis())] = "GET_SPEED_DYN";
 		setOtaTimeout(60000);
@@ -624,6 +662,7 @@ bool Spidermesh::ProcessState(bool eob)
 		// apiframe cmd = apiPacket({0x03, 0x01, 0x02, 0x06}); // ret reg 2 DYN
 		apiframe cmd = apiPacket(SMK_READ_REG, {0x00, 2, 6}, LOCAL);
 
+		setState(WAIT);
 		WriteAndExpectAnwser(gateway, cmd, 0x13,  "getdyn", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																		{
             //TIMEOUT
@@ -652,15 +691,13 @@ bool Spidermesh::ProcessState(bool eob)
 			else
 				setState(GET_SPEED_RF);
 
-            doProcessState = true; }));
+            doProcessState = true; 
+		}));
 
 		ret = true;
 	}
 	else if (isState(SET_SPEED_DUTY))
 	{
-		if (!eob || (eob_cnt != 2))
-			return false;
-
 		PRTLN("\n--> SET_SPEED_DYN");
 		log[String(millis())] = "SET_SPEED_DYN";
 		//pCurrentNode->second.otaStep = STEP_WAIT;
@@ -685,8 +722,8 @@ bool Spidermesh::ProcessState(bool eob)
 
 
 
+		setState(WAIT);
 		apiframe cmd = apiPacket(0x0A, {actualMeshSpeed.bo, actualMeshSpeed.bi, h, actualMeshSpeed.rd, actualMeshSpeed.rde, d}, LOCAL); // ret reg 2 DYN
-
 		WriteAndExpectAnwser(gateway, cmd, 0x1A, "setspeed",ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																		{
 			//TIMEOUT
@@ -700,100 +737,94 @@ bool Spidermesh::ProcessState(bool eob)
 			setState(GET_SPEED_RF);
 			
 			resetOtaTimeout();
-			doProcessState = true; }));
-
-		delay(50);
+			doProcessState = true; 
+		}));
 		ret = true;
-
 	}
 	else if (isState(GET_SPEED_RF))
 	{
-		if (eob_cnt > 2 && eob)
+		log[String(millis())] = "--OK";
+		//__________________________________________
+		PRTLN("\n--> GET_SPEED_RF");
+		// apiframe cmd = apiPacket({0x03, 1, 11, 1}); // reg preset from ram
+
+
+		setState(WAIT);
+		apiframe cmd = apiPacket(SMK_READ_REG, {1, 11, 1}, LOCAL); // reg preset from ram
+		WriteAndExpectAnwser(gateway, cmd, 0x13, "getpreset", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 		{
-			log[String(millis())] = "--OK";
-			//__________________________________________
-			PRTLN("\n--> GET_SPEED_RF");
-			// apiframe cmd = apiPacket({0x03, 1, 11, 1}); // reg preset from ram
+			//TIMEOUT
+			if(!success) {
+				pNode->second.otaStep = STEP_FAILED;
+					PRTLN("  Unable to get speed rf"); return; 
+			}
 
+			//SUCESS
 
-			apiframe cmd = apiPacket(SMK_READ_REG, {1, 11, 1}, LOCAL); // reg preset from ram
+			#define EXPECTED_PRESET_RF_DURING_OTA_UPDATE 0x10
+			uint8_t presetRF = packet[7]&0x10;
+			uint8_t expectedPresetRF = EXPECTED_PRESET_RF_DURING_OTA_UPDATE;
 
-			WriteAndExpectAnwser(gateway, cmd, 0x13, "getpreset", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
+			log[String(millis())] = "GET_SPEED_RF";
+
+			if(isMode(INIT_SMK900) || (firmware.isHost() && isMode(UPDATE_NODES_END))) expectedPresetRF = EXPECTED_PRESET_RF_AT_BOOT;
+
+			else if(requiredMeshSpeed.rf_speed !=-1)
 			{
-                //TIMEOUT
-                if(!success) {
-                    pNode->second.otaStep = STEP_FAILED;
-                     PRTLN("  Unable to get speed rf"); return; 
-                }
+				actualMeshSpeed.rf_speed = requiredMeshSpeed.rf_speed;
+				expectedPresetRF = requiredMeshSpeed.rf_speed;
+			}
 
-                //SUCESS
-
-				#define EXPECTED_PRESET_RF_DURING_OTA_UPDATE 0x10
-				uint8_t presetRF = packet[7]&0x10;
-				uint8_t expectedPresetRF = EXPECTED_PRESET_RF_DURING_OTA_UPDATE;
-
-				log[String(millis())] = "GET_SPEED_RF";
-
-				if(isMode(INIT_SMK900) || (firmware.isHost() && isMode(UPDATE_NODES_END))) expectedPresetRF = EXPECTED_PRESET_RF_AT_BOOT;
-
-				else if(requiredMeshSpeed.rf_speed !=-1)
+			if(presetRF==expectedPresetRF) //already ok so skip writing preset
+			{
+				setState(TEST_SERIAL_COMM);    
+			}
+			else
+			{
+				//__________________________________________
+				PRTLN("\n--> SET_SPEED_RF");
+				//apiframe cmd = apiPacket({0x04, 0, 11, 1,expectedPresetRF}); 
+				
+				setState(WAIT);
+				apiframe cmd = apiPacket(SMK_WRITE_REG, {0, 11, 1, expectedPresetRF}, LOCAL);
+				WriteAndExpectAnwser(gateway, cmd, 0x14, "getpreset", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void 
 				{
-					actualMeshSpeed.rf_speed = requiredMeshSpeed.rf_speed;
-					expectedPresetRF = requiredMeshSpeed.rf_speed;
-				}
+					//TIMEOUT
+					if(!success) {
+						PRTLN("  Unable to get speed rf"); return; 
+					}
 
-                if(presetRF==expectedPresetRF)
-                {
-                    setState(TEST_SERIAL_COMM);    
-                }
-                else
-                {
-                    //__________________________________________
-                    PRTLN("\n--> SET_SPEED_RF");
-                    //apiframe cmd = apiPacket({0x04, 0, 11, 1,expectedPresetRF}); 
-					
-					apiframe cmd = apiPacket(SMK_WRITE_REG, {0, 11, 1, expectedPresetRF}, LOCAL);
-                    WriteAndExpectAnwser(gateway, cmd, 0x14, "getpreset", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void 
-                    {
-                        //TIMEOUT
-                        if(!success) {
-                            PRTLN("  Unable to get speed rf"); return; 
-                        }
+					log[String(millis())] = "SET_SPEED_RF";
+					//__________________________________________
+					PRTLN("\n--> SAVE TO EEPROM");
+					//apiframe cmd = apiPacket({0x0B, 2});
+					setState(WAIT);
+					apiframe cmd = apiPacket(SMK_TRANSFERT_MEM, {2}, LOCAL);
+					WriteAndExpectAnwser(gateway, cmd, 0x1B, "getpreset", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void 
+					{
+						//TIMEOUT
+						if(!success) {
+							
+							PRTLN("  Unable to save to EEPROM"); return; 
+						}
 
-						log[String(millis())] = "SET_SPEED_RF";
-                        //__________________________________________
-                        PRTLN("\n--> SAVE TO EEPROM");
-                        //apiframe cmd = apiPacket({0x0B, 2});
-						apiframe cmd = apiPacket(SMK_TRANSFERT_MEM, {2}, LOCAL);
-                        WriteAndExpectAnwser(gateway, cmd, 0x1B, "getpreset", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void 
-                        {
-                            //TIMEOUT
-                            if(!success) {
-                                
-                                PRTLN("  Unable to save to EEPROM"); return; 
-                            }
-
-                            setState(RESET,TEST_SERIAL_COMM);
-                            PRTLN("  SAVE to EEPROM sucess");
-							log[String(millis())] = "SAVE to EEPROM";
-                            setOtaTimeout(300000);
-                            doProcessState = true;
-                        }));
-                        resetOtaTimeout();
-                    }));
-                } }));
-			ret = true;
-			doProcessState = false;
-		}
+						setState(RESET,TEST_SERIAL_COMM);
+						PRTLN("  SAVE to EEPROM sucess");
+						log[String(millis())] = "SAVE to EEPROM";
+						setOtaTimeout(300000);
+						doProcessState = true;
+					}));
+					resetOtaTimeout();
+				}));
+			} }));
+		ret = true;
 	}
 	else if (isState(TEST_SERIAL_COMM))
 	{
-		if (!eob)
-			return false;
-
 		//__________________________________________
 		PRTLN("\n--> TEST SERIAL COMM");
 		// apiframe cmd = apiPacket({0x03, 2, 11, 1});
+		setState(WAIT);
 		apiframe cmd = apiPacket(SMK_READ_REG, {2, 11, 1}, LOCAL);
 		WriteAndExpectAnwser(gateway, cmd, 0x13, 1, "testserial", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																		   {
@@ -802,7 +833,6 @@ bool Spidermesh::ProcessState(bool eob)
                 
                 PRTLN("  Unable reach gateway via serial"); return; 
             }
-            setState(PRIME_NODE_TO_UPDATE_INIT);
             PRTLN("  Test serial comm sucess");
 			
 			logJson("Test serial comm sucess");
@@ -817,7 +847,7 @@ bool Spidermesh::ProcessState(bool eob)
 				setState(HOST_CHECK_PROGRESS_INIT);
 			}
 			
-            else if(isMode(INIT_SMK900))
+            else 
             {
                 setMode(READY);
                 setState(IDLE);
@@ -829,18 +859,14 @@ bool Spidermesh::ProcessState(bool eob)
 	//----------------------------------------------------------
 	else if (isState(SET_CHANNEL_RF))
 	{
-		if (!eob || (eob_cnt !=2))
-			return false;
-
-
 		PRTLN("\n--> SET_CHANNEL_RF");
 		log[String(millis())] = "SET_CHANNEL_RF";
 		//pCurrentNode->second.otaStep = STEP_WAIT;
 		setOtaTimeout(60000);
 
+		setState(WAIT);
 		byte network_id = (channel_rf-1)%NWK_COUNT;
 		apiframe cmd = apiPacket(SMK_WRITE_REG, {0, 3, 1, network_id}, LOCAL);
-
 		WriteAndExpectAnwser(gateway, cmd, 0x14, "setchannel",ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																		{
 			//TIMEOUT
@@ -2468,6 +2494,11 @@ bool Spidermesh::ProcessState(bool eob)
 		{
 
 			PRTLN("\n\nOTA Engine timeout\n\n");
+			Serial.print("current_mode: ");
+			Serial.println(current_mode);
+			Serial.print("current_state: ");
+			Serial.println(current_state);
+
 			setState(IDLE);
 			firmware.close();
 			otaResult = "timeout transfert at " + getTimeFormated();
