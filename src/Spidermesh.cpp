@@ -80,7 +80,7 @@ void Spidermesh::begin(int hop, int duty, int rf_speed, uint64_t timeout)
 void Spidermesh::smkGatewayTaskCore(void *pvParameters)
 {
 	
-	mmux = portMUX_INITIALIZER_UNLOCKED;
+	mutexWebServer = portMUX_INITIALIZER_UNLOCKED;
 
 	//setlogBuffer(&logBuffer);
 	delay(1000);
@@ -289,7 +289,7 @@ String Spidermesh::getStateMachineStatus()
 	String ret = "";
 	jsonBuffer.clear();
 
-	portENTER_CRITICAL(&mmux);
+	portENTER_CRITICAL(&mutexWebServer);
 	jsonBuffer["stateProcess"] = translateOffStateToString();
 	jsonBuffer["result"] = otaResult;
 
@@ -309,7 +309,7 @@ String Spidermesh::getStateMachineStatus()
 			nodeList[m]["new_version"] = n.second.new_firmware.getVersionString() + " - " + n.second.new_firmware_pyboard.getVersionString();
 		}
 	}
-	portEXIT_CRITICAL(&mmux);
+	portEXIT_CRITICAL(&mutexWebServer);
 
 	serializeJson(jsonBuffer, ret);
 	return ret;
@@ -342,7 +342,7 @@ String Spidermesh::getSmk900Firmware(bool start)
 	jsonBuffer.clear();
 	JsonObject nodeList = jsonBuffer.createNestedObject("nodeList");
 
-	//portENTER_CRITICAL(&mmux);
+
 	jsonBuffer["stateProcess"] = translateOffStateToString();
 	for (auto n : nodes.pool)
 	{
@@ -354,7 +354,7 @@ String Spidermesh::getSmk900Firmware(bool start)
 			nodeList[m]["old_version"] = n.second.old_firmware.getVersionString();
 		}
 	}
-	//portEXIT_CRITICAL(&mmux);
+
 	serializeJson(jsonBuffer, ret);
 	return ret;
 }
@@ -2408,9 +2408,8 @@ bool Spidermesh::ProcessState(bool eob)
 				{
                     //TIMEOUT
                     if(!success) {
-						//portENTER_CRITICAL(&mmux);	
                         pNode->second.otaStep = STEP_WAIT;
-						//portEXIT_CRITICAL(&mmux);
+
                         PRTF(" Node %s unable get transfert to pyboard progress\n", pNode->second.getMacAsString());
                         return; 
                     }
@@ -2431,7 +2430,6 @@ bool Spidermesh::ProcessState(bool eob)
 						PRTF("  %.1f%% - ",perc_transfert);
 						PRTF2("%d/%d\n", c, t);
 						
-						//taskENTER_CRITICAL(mmux);	
 						pNode->second.otaStep = STEP_TRANSFERT;
 						pNode->second.labelState = String(perc_transfert) + "%";
 
@@ -2445,8 +2443,6 @@ bool Spidermesh::ProcessState(bool eob)
 							otaResult = "success transfert at " +getTimeFormated();
 							setState(STOP);
 						}
-
-						//taskEXIT_CRITICAL(mmux);
 						
 						resetOtaTimeout(); 
 					}

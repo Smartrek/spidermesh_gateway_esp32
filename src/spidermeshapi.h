@@ -17,6 +17,8 @@
 
 #include <mutex>
 
+#include "esp_task_wdt.h"
+
 #define PRT(x) (Serial.print(x))
 #define PRTF(x, z) (Serial.printf(x, z))
 #define PRTF2(x, y, z) (Serial.printf(x, y, z))
@@ -175,6 +177,8 @@ private:
 
 	static apiframe current_packet;
 	static HardwareSerial smkport;
+
+	static portMUX_TYPE mutexExpect;
 
 public:
 	static ExpectCallback cbAutomaticPolling;
@@ -340,8 +344,6 @@ public:
 	static bool parseReceivedData();
 	static void parseApiFromHost(uint8_t *buf, uint16_t len);
 
-	static unsigned int toInt(byte c);
-
 	//------------------------------------------------
 	// API COMMMAND SECTION
 	static bool addApiPacket(apiframe pkt, bool prior_lvl=false)
@@ -360,8 +362,6 @@ public:
 	static bool addApiPacket(uint8_t *buffer, int size) { return addApiPacketLowPriority(buffer, size); };
 	;
 
-	static bool isMessageStackEmpty() { return !(lowPriorityFifoCommandList.size() + highPriorityFifoCommandList.size()); };
-	static apiframe checkNextPacketToSend() { return lowPriorityFifoCommandList.front(); };
 	static bool isEobPacket(apiframe pkt)
 	{
 		if (pkt.size() > 3)
@@ -370,57 +370,26 @@ public:
 		return false;
 	};
 
-public:
-	static void ClearFifoAndExpectList()
-	{
-		writeAndExpectList.clear();
-		lowPriorityFifoCommandList.clear();
-		highPriorityFifoCommandList.clear();
-		dumpReceivedBuffer();
-	};
 
-private:
+protected:
 	static WriteAndExpectList_t writeAndExpectList;
 	static commandList_t lowPriorityFifoCommandList;
 	static commandList_t highPriorityFifoCommandList;
 	static bool _otaPacketInCycle;
 
+	static bool isMessageStackEmpty() { return !(lowPriorityFifoCommandList.size() + highPriorityFifoCommandList.size()); };
+	static apiframe checkNextPacketToSend() { return lowPriorityFifoCommandList.front(); };
 
 public:
+	static void ClearFifoAndExpectList();
 	static bool addApiPacketLowPriority(apiframe hexCommand);
 	static bool addApiPacketLowPriority(String asciiCommand);
 	static bool addApiPacketLowPriority(const char *asciiCommand);
 	static bool addApiPacketLowPriority(uint8_t *buffer, int size);
 	static bool addApiPacketHighPriority(apiframe hcmd);
 
-	static bool addWriteExpect(MeshRequest_t r)
-	{
-		writeAndExpectList.push_back(r);
-		return true;
-	};
-	static bool addWriteExpect(mesh_t::iterator p, apiframe h, String t, ExpectCallback cb)
-	{
-		MeshRequest_t req = {p, h, cb, t};
-		writeAndExpectList.push_back(req);
-		return true;
-	};
-
-	static mesh_t::iterator find(uint32_t add)
-	{
-		for (auto x = nodes.pool.begin(); x != nodes.pool.end(); x++)
-		{
-			if (x->first == add)
-				return x;
-		}
-		return nodes.pool.end();
-	};
-	static mesh_t::iterator find(String x)
-	{
-		uint32_t add;
-		if(macStringToInt(x,&add))
-			return find(add);
-		return nodes.pool.end();
-	};	
+	static bool addWriteExpect(MeshRequest_t r);
+	static bool addWriteExpect(mesh_t::iterator p, apiframe h, String t, ExpectCallback cb);
 
 	//------------------------------------------------
 	// EXPECT API COMMMAND SECTION
@@ -447,127 +416,53 @@ public:
 
 	static void AddToTerminalBuffer(String head, apiframe *cmd);
 
+protected:
+	static mesh_t::iterator find(uint32_t add)
+	{
+		for (auto x = nodes.pool.begin(); x != nodes.pool.end(); x++)
+		{
+			if (x->first == add)
+				return x;
+		}
+		return nodes.pool.end();
+	};
+	static mesh_t::iterator find(String x)
+	{
+		uint32_t add;
+		if(macStringToInt(x,&add))
+			return find(add);
+		return nodes.pool.end();
+	};	
+
+
+
 #ifdef PORTIA_KLIK_THREADSAFING_ENABLED
 private:
 	std::recursive_mutex mPortiaMutex;
 #endif
 
 	std::recursive_mutex mPortiaWebServerMutex;
-
-private:
 	static SemaphoreHandle_t xMutex;
-
-public:
-
+protected:
 	static firmware_t firmware;
-
-
-
-
-
-
-
-
-
-
-	static apiframe apiPacket(uint8_t cmd, apiframe pkt, bool local=true, bool broadcastOtaUpdate = false, uint8_t phase = 0)
-	{
-
-		if(!local)
-		{
-			cmd |=0x80;
-			if(broadcastOtaUpdate) cmd |=0x40;
-			if(!broadcastOtaUpdate)
-			{
-				pkt.insert(pkt.begin(), pCurrentNode->second.mac.bOff[byte2]);
-				pkt.insert(pkt.begin(), pCurrentNode->second.mac.bOff[byte1]);
-				pkt.insert(pkt.begin(), pCurrentNode->second.mac.bOff[byte0]);
-				
-			}
-			pkt.insert(pkt.begin(), cmd);
-			pkt.insert(pkt.begin(), phase);
-			pkt.insert(pkt.begin(), 0x0C); //wrapper
-		}
-		else
-		pkt.insert(pkt.begin(), cmd);
-
-		int len = pkt.size();
-		pkt.insert(pkt.begin(), 0);
-		pkt.insert(pkt.begin(), len);
-		pkt.insert(pkt.begin(), 0xFB);
-
-		if(show_apipkt_out)
-			printApiPacket(pkt, PREFIX_OUT);
-		return pkt;
-	};
-
-	static apiframe apiPacket(mesh_t::iterator pNode, uint8_t cmd, apiframe pkt, bool local=true, bool broadcastOtaUpdate = false, uint8_t phase = 0)
-	{
-
-		if(!local)
-		{
-			cmd |=0x80;
-			if(broadcastOtaUpdate) cmd |=0x40;
-			if(!broadcastOtaUpdate)
-			{
-				pkt.insert(pkt.begin(), pNode->second.mac.bOff[byte2]);
-				pkt.insert(pkt.begin(), pNode->second.mac.bOff[byte1]);
-				pkt.insert(pkt.begin(), pNode->second.mac.bOff[byte0]);
-				
-			}
-			pkt.insert(pkt.begin(), cmd);
-			pkt.insert(pkt.begin(), phase);
-			pkt.insert(pkt.begin(), 0x0C); //wrapper
-		}
-		else
-		pkt.insert(pkt.begin(), cmd);
-
-		int len = pkt.size();
-		pkt.insert(pkt.begin(), 0);
-		pkt.insert(pkt.begin(), len);
-		pkt.insert(pkt.begin(), 0xFB);
-
-		printApiPacket(pkt, PREFIX_OUT);
-		return pkt;
-	};
-
-
-	/*
-	apiframe apiPacket(apiframe pkt, mesh_t::iterator pNode, apiframe tail = {});
-	apiframe apiPacket(apiframe pkt, mesh_t::iterator pNode, apiframe sub_command, byte *payload, uint16_t len_payload);
-	*/
-
 	static bool findNext(bool onlyRemote=true, bool initSearch=false);
 	static bool isStepCompleted(bool otaActiveOnly=true);
+
+public:
+	static apiframe apiPacket(uint8_t cmd, apiframe pkt, bool local=true, bool broadcastOtaUpdate = false, uint8_t phase = 0);
+	static apiframe apiPacket(mesh_t::iterator pNode, uint8_t cmd, apiframe pkt, bool local=true, bool broadcastOtaUpdate = false, uint8_t phase = 0);
 
 	static uint16_t getNumberOfNodeToUpdate()
 	{
 		uint16_t ret = 0;
-		auto next = nodes.pool.begin();
-
-		while (next != nodes.pool.end())
-		{
-			if (next->second.otaActive)
-				ret++;
-			next++;
-		}
+		for (auto next : nodes.pool)
+			if (next.second.otaActive) ret++;
 		return ret;
 	};
 
-public:
-	
-
-
-
-	// http://www.iotsharing.com/2017/06/how-to-use-binary-semaphore-mutex-counting-semaphore-resource-management.html
-
-
-
 
 protected:
-	static portMUX_TYPE mmux;
-
-
+	static portMUX_TYPE mutexWebServer;
 };
 
 #endif

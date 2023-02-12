@@ -10,7 +10,8 @@
 #endif
 
 
-
+portMUX_TYPE SpidermeshApi::mutexExpect;
+portMUX_TYPE SpidermeshApi::mutexWebServer;
 
 mesh_t::iterator SpidermeshApi::gateway;
 mesh_t SpidermeshApi::gateway_boot;
@@ -50,7 +51,7 @@ unsigned long SpidermeshApi::previousMillisExpectPacketReceived;
 bool SpidermeshApi::watchdog_serial_parser;
 unsigned long SpidermeshApi::previousMillisPacketParser;
 uint8_t SpidermeshApi::idx_polling_cnt;
-portMUX_TYPE SpidermeshApi::mmux;
+
 
 WriteAndExpectList_t SpidermeshApi::writeAndExpectList;
 commandList_t SpidermeshApi::lowPriorityFifoCommandList;
@@ -89,6 +90,8 @@ SpidermeshApi::SpidermeshApi()
     idx_polling_cnt=0;
 
     cbWhenPacketReceived = [](apiframe){};
+
+    mutexExpect = portMUX_INITIALIZER_UNLOCKED;
 
 
 }
@@ -490,7 +493,7 @@ void SpidermeshApi::AddToTerminalBuffer(String head, apiframe *cmd)
 bool SpidermeshApi::sendNextPacketBuffered()
 {
     bool ret = false;
-
+    taskENTER_CRITICAL(&mutexExpect);
     if (writeAndExpectList.size()>0 || lowPriorityFifoCommandList.size() > 0 || highPriorityFifoCommandList.size() > 0)
     {
         //send the command
@@ -520,24 +523,35 @@ bool SpidermeshApi::sendNextPacketBuffered()
 
         ret = true;
     }
-
+    taskEXIT_CRITICAL(&mutexExpect);
 
     return ret;
 }
 
-unsigned int SpidermeshApi::toInt(byte c)
+void SpidermeshApi::ClearFifoAndExpectList()
 {
-    if (c >= '0' && c <= '9')
-        return c - '0';
-    if (c >= 'A' && c <= 'F')
-        return 10 + c - 'A';
-    if (c >= 'a' && c <= 'f')
-        return 10 + c - 'a';
-    return -1;
+    taskENTER_CRITICAL(&mutexExpect);
+    writeAndExpectList.clear();
+    lowPriorityFifoCommandList.clear();
+    highPriorityFifoCommandList.clear();
+    taskEXIT_CRITICAL(&mutexExpect);
+    dumpReceivedBuffer();
 }
 
+bool SpidermeshApi::addWriteExpect(MeshRequest_t r)
+{
+    taskENTER_CRITICAL(&mutexExpect);
+    writeAndExpectList.push_back(r);
+    taskEXIT_CRITICAL(&mutexExpect);
+    return true;
+}
 
-
+bool SpidermeshApi::addWriteExpect(mesh_t::iterator p, apiframe h, String t, ExpectCallback cb)
+{
+    MeshRequest_t req = {p, h, cb, t};
+    addWriteExpect(req);
+    return true;
+}
 
 bool SpidermeshApi::addApiPacketLowPriority(String asciiCommand)
 {
@@ -558,16 +572,10 @@ bool SpidermeshApi::addApiPacketLowPriority(uint8_t* buffer, int size)
     addApiPacketLowPriority(buf_hex);
     return true;
 }
-/*
-bool SpidermeshApi::addApiPacketLowPriority(apiframe hcmd)
-{
-    lowPriorityFifoCommandList.push_back(hcmd);
-    return true;
-}
-*/
 
 bool SpidermeshApi::addApiPacketLowPriority(apiframe hcmd)
 {
+    taskENTER_CRITICAL(&mutexExpect);
     if(lowPriorityFifoCommandList.size() <= PORTIA_FIFO_LOW_PRIORITY_SIZE)
     {
 #if ON_DEMAND_COMMAND_MUST_BE_DIFFERENT_FROM_THE_LAST_ONE == 1
@@ -588,7 +596,7 @@ bool SpidermeshApi::addApiPacketLowPriority(apiframe hcmd)
     {
         Serial.println("maximum FIFO size reached!");
     }
-    
+    taskEXIT_CRITICAL(&mutexExpect);
 
     return false;
 }
@@ -596,6 +604,7 @@ bool SpidermeshApi::addApiPacketLowPriority(apiframe hcmd)
 
 bool SpidermeshApi::addApiPacketHighPriority(apiframe hcmd)
 {
+    taskENTER_CRITICAL(&mutexExpect);
     if(highPriorityFifoCommandList.size() <= PORTIA_FIFO_HIGH_PRIORITY_SIZE)
     {
     #if ON_DEMAND_COMMAND_MUST_BE_DIFFERENT_FROM_THE_LAST_ONE == 1
@@ -608,6 +617,8 @@ bool SpidermeshApi::addApiPacketHighPriority(apiframe hcmd)
     #endif
         return true;
     }
+    taskEXIT_CRITICAL(&mutexExpect);
+
     return false;
 }
 
@@ -1031,4 +1042,65 @@ bool SpidermeshApi::findNext(bool onlyRemote, bool initSearch)
     #endif
 
 	return ret;
+}
+
+
+apiframe SpidermeshApi::apiPacket(uint8_t cmd, apiframe pkt, bool local, bool broadcastOtaUpdate, uint8_t phase)
+{
+
+    if(!local)
+    {
+        cmd |=0x80;
+        if(broadcastOtaUpdate) cmd |=0x40;
+        if(!broadcastOtaUpdate)
+        {
+            pkt.insert(pkt.begin(), pCurrentNode->second.mac.bOff[byte2]);
+            pkt.insert(pkt.begin(), pCurrentNode->second.mac.bOff[byte1]);
+            pkt.insert(pkt.begin(), pCurrentNode->second.mac.bOff[byte0]);
+            
+        }
+        pkt.insert(pkt.begin(), cmd);
+        pkt.insert(pkt.begin(), phase);
+        pkt.insert(pkt.begin(), 0x0C); //wrapper
+    }
+    else
+    pkt.insert(pkt.begin(), cmd);
+
+    int len = pkt.size();
+    pkt.insert(pkt.begin(), 0);
+    pkt.insert(pkt.begin(), len);
+    pkt.insert(pkt.begin(), 0xFB);
+
+    if(show_apipkt_out)
+        printApiPacket(pkt, PREFIX_OUT);
+    return pkt;
+}
+
+apiframe SpidermeshApi::apiPacket(mesh_t::iterator pNode, uint8_t cmd, apiframe pkt, bool local, bool broadcastOtaUpdate, uint8_t phase)
+{
+    if(!local)
+    {
+        cmd |=0x80;
+        if(broadcastOtaUpdate) cmd |=0x40;
+        if(!broadcastOtaUpdate)
+        {
+            pkt.insert(pkt.begin(), pNode->second.mac.bOff[byte2]);
+            pkt.insert(pkt.begin(), pNode->second.mac.bOff[byte1]);
+            pkt.insert(pkt.begin(), pNode->second.mac.bOff[byte0]);
+            
+        }
+        pkt.insert(pkt.begin(), cmd);
+        pkt.insert(pkt.begin(), phase);
+        pkt.insert(pkt.begin(), 0x0C); //wrapper
+    }
+    else
+    pkt.insert(pkt.begin(), cmd);
+
+    int len = pkt.size();
+    pkt.insert(pkt.begin(), 0);
+    pkt.insert(pkt.begin(), len);
+    pkt.insert(pkt.begin(), 0xFB);
+
+    printApiPacket(pkt, PREFIX_OUT);
+    return pkt;
 }
