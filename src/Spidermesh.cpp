@@ -33,6 +33,8 @@ int Spidermesh::sim_skip_first_packet;
 
 std::function<void()> Spidermesh::cbLoadExternalParamFiles;
 
+portMUX_TYPE Spidermesh::mutexWebServer;
+
 
 void Spidermesh::begin(int hop, int duty, int rf_speed, uint64_t timeout)
 {
@@ -43,7 +45,7 @@ void Spidermesh::begin(int hop, int duty, int rf_speed, uint64_t timeout)
     if(rf_speed==72) requiredMeshSpeed.rf_speed = PRESET_72B;
 
 
-    
+    mutexWebServer = portMUX_INITIALIZER_UNLOCKED;
 
 	xTaskCreatePinnedToCore(
 	//xTaskCreate(
@@ -55,11 +57,8 @@ void Spidermesh::begin(int hop, int duty, int rf_speed, uint64_t timeout)
 		&Task1, /*  */
 		1);		/* core # (0-1) arduino loop fn is on core 1 */ 
 
-
-
 		uint64_t timeout_end = millis()+timeout;
 		bool timeout_flag = false;
-
 
 		while(!isReady() && !timeout_flag) 
 		{
@@ -71,17 +70,11 @@ void Spidermesh::begin(int hop, int duty, int rf_speed, uint64_t timeout)
 			delay(100);
 		}
 		Serial.println("  smk900 begin done");
-
-
-
 }
 
 
 void Spidermesh::smkGatewayTaskCore(void *pvParameters)
 {
-	
-	mutexWebServer = portMUX_INITIALIZER_UNLOCKED;
-
 	//setlogBuffer(&logBuffer);
 	delay(1000);
 	if (!SpidermeshApi::init())
@@ -89,11 +82,9 @@ void Spidermesh::smkGatewayTaskCore(void *pvParameters)
 
 	SpidermeshApi::setWhenEobIsReceived(ProcessState);
 
-
     setMode(INIT_SMK900);
     setState(INIT_GATEWAY_REGISTER);
     setOtaTimeout(60000);
-
 
 	String mode = getPollingMode();
 	if (mode == "time" || mode == "fast")
@@ -498,13 +489,11 @@ bool Spidermesh::ProcessState(bool eob)
 	{
 
 	}
-
 	else if (isState(RESET))
 	{
 		if (eob_cnt == 2 && eob)
 		{
 			apiframe cmd = apiPacket(SMK_SOFT_RESET, {0}, LOCAL); // reg preset from ram
-
 			WriteAndExpectAnwser(gateway, cmd, 0x12, "reset", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 			{
                 //TIMEOUT
@@ -559,9 +548,9 @@ bool Spidermesh::ProcessState(bool eob)
 	}
 	else if (isState(INIT_GATEWAY_REGISTER))
 	{
-	#if SHOW_SMK900_INIT
+		#if SHOW_SMK900_INIT
 		Serial.println("--> INIT_GATEWAY_REGISTER");
-	#endif
+		#endif
 		setState(INIT_GATEWAY_REGISTER_WAIT_DONE);
 		log[String(millis())] = "INIT smk900";
 
@@ -582,20 +571,19 @@ bool Spidermesh::ProcessState(bool eob)
 																			{
             if(!success) { Serial.println(" Error: Unable to set EOB flag"); return; }
 
-	#if SHOW_SMK900_INIT
+			#if SHOW_SMK900_INIT
             Serial.println("  EOB flag enabled");
-	#endif
+			#endif
 
             //uint8_t uart_setting[10] = {0x0E, 0,0,0,0,0,100,0};
             //apiframe cmd2 = localSetRegister(34,8,uart_setting); //Enable sleep for the gateway in order to fix esd bug...
 			apiframe cmd2 = apiPacket(SMK_WRITE_REG, {0x00, 34, 0x08, 0x0E, 0,0,0,0,0,100,0}, LOCAL);
-			
 
             WriteAndExpectAnwser(gateway_boot.begin(), cmd2,0x14,  "init", ExpectCallback([](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void {
                 if(!success) { return; }
-	#if SHOW_SMK900_INIT
+				#if SHOW_SMK900_INIT
                 Serial.println(pNode->second.name + "  Gateway sleep mode enabled");
-	#endif
+				#endif
 				//log[String(millis())] = "EOB written";
             
                 //apiframe cmd3 = localTransfertConfigFromRAMBUFF(1); //transfert it to RAM to enable config sent
@@ -603,46 +591,43 @@ bool Spidermesh::ProcessState(bool eob)
 				apiframe cmd3 = apiPacket(SMK_TRANSFERT_MEM, {0x01}, LOCAL);
                 WriteAndExpectAnwser(gateway_boot.begin(), cmd3, 0x1B,  "init", ExpectCallback([](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void {
                     if(!success) { Serial.println(" Node " + pNode->second.name + " is unavailable."); return; }
-	#if SHOW_SMK900_INIT
-                        Serial.println(pNode->second.name + "  Transfert to RAM");
-	#endif
+						#if SHOW_SMK900_INIT
+                        	Serial.println(pNode->second.name + "  Transfert to RAM");
+						#endif
 
                         //apiframe cmd5 = requestMacAddress();
 						//uint8_t cmd[20] = {0xFB, 4, 0, 3, 2,0,8};
 						apiframe cmd5 = apiPacket(SMK_READ_REG, {0x00, 0x00, 0x08}, LOCAL);
-                        
-                        WriteAndExpectAnwser(gateway_boot.begin(), cmd5, 0x13,  "init", ExpectCallback([](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void {
-                            if(!success) { Serial.println(" Node " +   pNode->second.name + " is unavailable."); return; }
-                            
-                            SaveGatewayMacAddress(packet);
-							IPAddress RepliedMacAddress = {packet[10], packet[9], packet[8], packet[7]}; 
-							String smac =RepliedMacAddress.toString();
-							uint32_t a = SmkList::macString2Umac(smac);
+					
+					WriteAndExpectAnwser(gateway_boot.begin(), cmd5, 0x13,  "init", ExpectCallback([](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void {
+						if(!success) { Serial.println(" Node " +   pNode->second.name + " is unavailable."); return; }
+						
+						SaveGatewayMacAddress(packet);
+						IPAddress RepliedMacAddress = {packet[10], packet[9], packet[8], packet[7]}; 
+						String smac =RepliedMacAddress.toString();
+						uint32_t a = SmkList::macString2Umac(smac);
 
-							if(!initDone)
-							{
-								nodes.pool.clear(); 
-								nodes.add(a, "gateway", LOCAL, "main", "main gateway");
-								gateway=nodes.pool.begin();
-								if(cbLoadExternalParamFiles) cbLoadExternalParamFiles();
-								else{
-									nodes.loadParamFiles();
-								} 
-
-								PRT("GATEWAY mac is: ");
-								PRTLN(smac);
-
-							}
-							SpidermeshApi::findNext(true,true);
-							//auto g = gateway;
-                            initDone = true;
-							setState(GET_SPEED_DYN);
-							
-							
-                        }));
+						if(!initDone)
+						{
+							nodes.pool.clear(); 
+							nodes.add(a, "gateway", LOCAL, "main", "main gateway");
+							gateway=nodes.pool.begin();
+							if(cbLoadExternalParamFiles) cbLoadExternalParamFiles();
+							else{
+								nodes.loadParamFiles();
+							} 
+							PRT("GATEWAY mac is: ");
+							PRTLN(smac);
+						}
+						SpidermeshApi::findNext(true,true);
+						//auto g = gateway;
+						initDone = true;
+						setState(GET_SPEED_DYN);
+					}));
                 }));
             })); 
 		}));
+
 		ret = true;
 	}
 	else if (isState(INIT_GATEWAY_REGISTER_WAIT_DONE))
@@ -666,9 +651,7 @@ bool Spidermesh::ProcessState(bool eob)
 		WriteAndExpectAnwser(gateway, cmd, 0x13,  "getdyn", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																		{
             //TIMEOUT
-            if(!success) {
-                PRTLN("  Unable to get speed dyn"); return; 
-            }
+            if(!success) { PRTLN("  Unable to get speed dyn"); return; }
         
             //SUCESS
             PRTF("  dyn bo:%d", packet[7]);
@@ -686,12 +669,8 @@ bool Spidermesh::ProcessState(bool eob)
             actualMeshSpeed.duty = packet[12];
             resetOtaTimeout();
 
-			if(!isDynOptimalUpdateSpeed())
-            	setState(SET_SPEED_DUTY);
-			else
-				setState(GET_SPEED_RF);
-
-            doProcessState = true; 
+			if(!isDynOptimalUpdateSpeed()) setState(SET_SPEED_DUTY);
+			else setState(GET_SPEED_RF);
 		}));
 
 		ret = true;
@@ -700,15 +679,12 @@ bool Spidermesh::ProcessState(bool eob)
 	{
 		PRTLN("\n--> SET_SPEED_DYN");
 		log[String(millis())] = "SET_SPEED_DYN";
-		//pCurrentNode->second.otaStep = STEP_WAIT;
 		setOtaTimeout(60000);
 
 		uint8_t h = readFile("/hops").toInt();
-		if (h == 0)
-			h = 8;
+		if (h == 0) h = 8;
 		uint8_t d = readFile("/duty").toInt();
-		if (d == 0)
-			d = 5;
+		if (d == 0)	d = 5;
 
 
 		//if specified by user with begin function
@@ -720,8 +696,6 @@ bool Spidermesh::ProcessState(bool eob)
 			d=requiredMeshSpeed.duty;
 		}
 
-
-
 		setState(WAIT);
 		apiframe cmd = apiPacket(0x0A, {actualMeshSpeed.bo, actualMeshSpeed.bi, h, actualMeshSpeed.rd, actualMeshSpeed.rde, d}, LOCAL); // ret reg 2 DYN
 		WriteAndExpectAnwser(gateway, cmd, 0x1A, "setspeed",ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
@@ -729,7 +703,7 @@ bool Spidermesh::ProcessState(bool eob)
 			//TIMEOUT
 			if(!success) {
 				pNode->second.otaStep = STEP_FAILED;
-					PRTLN("  Unable to set speed dyn"); return; 
+				PRTLN("  Unable to set speed dyn"); return; 
 			}
 			log[String(millis())] = "--OK";
 		
@@ -737,7 +711,6 @@ bool Spidermesh::ProcessState(bool eob)
 			setState(GET_SPEED_RF);
 			
 			resetOtaTimeout();
-			doProcessState = true; 
 		}));
 		ret = true;
 	}
@@ -790,9 +763,7 @@ bool Spidermesh::ProcessState(bool eob)
 				WriteAndExpectAnwser(gateway, cmd, 0x14, "getpreset", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void 
 				{
 					//TIMEOUT
-					if(!success) {
-						PRTLN("  Unable to get speed rf"); return; 
-					}
+					if(!success) { PRTLN("  Unable to get speed rf"); return; }
 
 					log[String(millis())] = "SET_SPEED_RF";
 					//__________________________________________
@@ -803,20 +774,17 @@ bool Spidermesh::ProcessState(bool eob)
 					WriteAndExpectAnwser(gateway, cmd, 0x1B, "getpreset", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void 
 					{
 						//TIMEOUT
-						if(!success) {
-							
-							PRTLN("  Unable to save to EEPROM"); return; 
-						}
+						if(!success) { PRTLN("  Unable to save to EEPROM"); return; }
 
 						setState(RESET,TEST_SERIAL_COMM);
 						PRTLN("  SAVE to EEPROM sucess");
 						log[String(millis())] = "SAVE to EEPROM";
 						setOtaTimeout(300000);
-						doProcessState = true;
 					}));
 					resetOtaTimeout();
 				}));
-			} }));
+			} 
+		}));
 		ret = true;
 	}
 	else if (isState(TEST_SERIAL_COMM))
@@ -829,12 +797,8 @@ bool Spidermesh::ProcessState(bool eob)
 		WriteAndExpectAnwser(gateway, cmd, 0x13, 1, "testserial", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																		   {
             //TIMEOUT
-            if(!success) {
-                
-                PRTLN("  Unable reach gateway via serial"); return; 
-            }
+            if(!success) { PRTLN("  Unable reach gateway via serial"); return; }
             PRTLN("  Test serial comm sucess");
-			
 			logJson("Test serial comm sucess");
 
             if(isMode(UPDATE_NODES)) 
@@ -868,7 +832,7 @@ bool Spidermesh::ProcessState(bool eob)
 		byte network_id = (channel_rf-1)%NWK_COUNT;
 		apiframe cmd = apiPacket(SMK_WRITE_REG, {0, 3, 1, network_id}, LOCAL);
 		WriteAndExpectAnwser(gateway, cmd, 0x14, "setchannel",ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
-																		{
+		{
 			//TIMEOUT
 			if(!success) {
 				pNode->second.otaStep = STEP_FAILED;
@@ -879,7 +843,7 @@ bool Spidermesh::ProcessState(bool eob)
 			byte htable=  HOPTABLE_50K_START + (channel_rf-1)%HOPTABLE_50K_COUNT;
 			apiframe cmd = apiPacket(SMK_WRITE_REG, {0, 4, 1, htable}, LOCAL);
 			WriteAndExpectAnwser(gateway, cmd, 0x14, "sethoptable",ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
-																			{
+			{
 				//TIMEOUT
 				if(!success) {
 					pNode->second.otaStep = STEP_FAILED;
@@ -944,7 +908,7 @@ bool Spidermesh::ProcessState(bool eob)
 				apiframe cmd = apiPacket(SMK_READ_REG, {0x02, 0x15, 1}, pCurrentNode->second.local);
 
 				WriteAndExpectAnwser(pCurrentNode, cmd, SMK_READ_REG, "readV1", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
-																			 {
+				{
                     if(!success) {  //TIMEOUT
                         PRTF("  Node %s unable to read version.\n", pNode->second.getMacAsString().c_str()); 
                         if(isMode(READ_VERSION_SMK900))
@@ -965,7 +929,6 @@ bool Spidermesh::ProcessState(bool eob)
                             findNextNode(false,!isMode(READ_VERSION_SMK900));
                             pNode->second.otaStep = STEP_RETRY;
                         }
-
                         return; 
                     }
                     resetOtaTimeout();
@@ -1030,7 +993,6 @@ bool Spidermesh::ProcessState(bool eob)
 
                             firmware.current_progress++;
 
-
                             //apiframe cmd = apiPacket({0x0C, 0x00, 0x83},pCurrentNode,{0x02, 0x1A, 0x01}); // READ SUB VERSION REGISTER
 							apiframe cmd = apiPacket(SMK_READ_REG, {0x02, 0x1A, 1},pCurrentNode->second.local);
                             WriteAndExpectAnwser(pCurrentNode,cmd,SMK_READ_REG, "readV4", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void 
@@ -1050,8 +1012,6 @@ bool Spidermesh::ProcessState(bool eob)
                                 pNode->second.otaStep = STEP_DONE;
                                 firmware.current_progress++;
 
-                                
-                                
                                 if(nodes.isStepComplete()) 
                                 {
                                     if(isMode(UPDATE_NODES) && (firmware.isSmk900() || firmware.isHost()))

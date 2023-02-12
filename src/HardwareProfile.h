@@ -114,7 +114,7 @@
 #define ETH_MDIO_PIN 18
 
 #elif defined(ESP32_SMG)
-//PORTIA define
+	//PORTIA define
 	#define RX_PORTIA 34
 	#define TX_PORTIA 32
 	#define CTS_PORTIA 33
@@ -136,15 +136,10 @@
 		// Pin# of the I²C IO signal for the Ethernet PHY
 		#define ETH_MDIO_PIN 18
 	#endif
-
-
 #endif
 
 
 #define WATCHDOG_SMK900_ENABLE true
-#define PORTIA_KLIK_THREADSAFING_ENABLED
-
-
 #define WIFI_ACCESS_POINT true
 
 
@@ -155,15 +150,7 @@
 #define NB_EOB_TO_LET_COUNTERMEASURE_WORK 1
 #define NB_EOB_AT_FULL_SPEED 200
 
-
-
-
 #define SIZE_OF_DYNAMIC_JSON_FILE 30000
 #define SIZE_OF_DYNAMIC_JSON_TYPE 20000
-
-
-//#define BYPASS_D_PID_VIEWER_ONLY
-//#define ALWAYS_CHECK_FOR_PORTIA_MAC
-//#define MDNS_BLOCKING_UNTIL_SETUP_OK
 
 #endif //HARDWARE_PROFILE_H

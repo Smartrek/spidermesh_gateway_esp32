@@ -3,15 +3,9 @@
 #include "soc/uart_struct.h"
 
 
-#ifdef PORTIA_KLIK_THREADSAFING_ENABLED
-    #define PORTIA_SYNCHRONIZE() std::unique_lock<std::recursive_mutex> lock(mPortiaMutex)
-#else
-    #define PORTIA_SYNCHRONIZE() do{}while(0)
-#endif
-
 
 portMUX_TYPE SpidermeshApi::mutexExpect;
-portMUX_TYPE SpidermeshApi::mutexWebServer;
+
 
 mesh_t::iterator SpidermeshApi::gateway;
 mesh_t SpidermeshApi::gateway_boot;
@@ -92,8 +86,6 @@ SpidermeshApi::SpidermeshApi()
     cbWhenPacketReceived = [](apiframe){};
 
     mutexExpect = portMUX_INITIALIZER_UNLOCKED;
-
-
 }
 
 bool SpidermeshApi::init()
@@ -155,14 +147,13 @@ void SpidermeshApi::reset()
 
 void SpidermeshApi::write(uint32_t c)
 {
-    //PORTIA_SYNCHRONIZE();
     smkport.write(c);
 }
 void SpidermeshApi::write32(uint32_t c)
 {
     u_bytes u;
     u.uint32b = c;
-    //PORTIA_SYNCHRONIZE();
+
     smkport.write(u.uint8b[0]);
     smkport.write(u.uint8b[1]);
     smkport.write(u.uint8b[2]);
@@ -194,7 +185,6 @@ void SpidermeshApi::SaveGatewayMacAddress(apiframe packet)
 
 apiframe SpidermeshApi::localSetRegister(uint8_t offset_register, uint8_t size_register, uint8_t *content)
 {
-    //PORTIA_SYNCHRONIZE();
     uint8_t cmd[20] = {0xFB, 0, 0, 4, 0, offset_register, size_register};
     memcpy(cmd+7, content, size_register);
     uint8_t len = size_register + 4;
@@ -210,7 +200,6 @@ apiframe SpidermeshApi::localSetRegister(uint8_t offset_register, uint8_t size_r
 
 apiframe SpidermeshApi::localTransfertConfigFromRAMBUFF(uint8_t location)
 {
-    //PORTIA_SYNCHRONIZE();
     uint8_t cmd[5] = {0xFB, 2, 0, 0x0B, location};
 
     apiframe ret;
@@ -224,7 +213,6 @@ apiframe SpidermeshApi::localTransfertConfigFromRAMBUFF(uint8_t location)
 
 apiframe SpidermeshApi::setDyn(uint8_t po, uint8_t pi,uint8_t hop, uint8_t rdx, uint8_t rde, uint8_t duty)
 {
-    //PORTIA_SYNCHRONIZE();
     uint8_t cmd[10] = {0xFB, 7, 0, 0x0A, po, pi, hop, rdx, rde, duty};
 
     apiframe ret;
@@ -237,7 +225,6 @@ apiframe SpidermeshApi::setDyn(uint8_t po, uint8_t pi,uint8_t hop, uint8_t rdx, 
 
 apiframe SpidermeshApi::requestMacAddress()
 {
-    //PORTIA_SYNCHRONIZE();    
     Serial.println("==Request Gateway Mac Address");
     uint8_t cmd[20] = {0xFB, 4, 0, 3, 2,0,8};
 

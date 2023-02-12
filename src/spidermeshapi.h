@@ -180,6 +180,7 @@ private:
 
 	static portMUX_TYPE mutexExpect;
 
+
 public:
 	static ExpectCallback cbAutomaticPolling;
 	static ExpectCallback cb_automatic_polling_failed;
@@ -262,7 +263,6 @@ public:
 	//------------------------------------
 	// Nodes managed by the gateway
 	static SmkList nodes;
-	static std::mutex nodes_mutex;
 	static uint8_t idx_polling_cnt;
 	static String polling_mode;
 	static uint32_t focus_node;
@@ -435,14 +435,6 @@ protected:
 	};	
 
 
-
-#ifdef PORTIA_KLIK_THREADSAFING_ENABLED
-private:
-	std::recursive_mutex mPortiaMutex;
-#endif
-
-	std::recursive_mutex mPortiaWebServerMutex;
-	static SemaphoreHandle_t xMutex;
 protected:
 	static firmware_t firmware;
 	static bool findNext(bool onlyRemote=true, bool initSearch=false);
@@ -460,9 +452,6 @@ public:
 		return ret;
 	};
 
-
-protected:
-	static portMUX_TYPE mutexWebServer;
 };
 
 #endif

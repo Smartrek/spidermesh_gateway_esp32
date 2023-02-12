@@ -176,6 +176,8 @@ class Spidermesh : public SpidermeshApi
 	static int wait_eob_count;
 
 
+	static portMUX_TYPE mutexWebServer;	
+
     //SIMULATION OF STATE MACHINE
 	#if SIM_SKIP_SOME_BROADCAST_UPLOAD
 	static int sim_skip_first_packet;
