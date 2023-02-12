@@ -29,13 +29,16 @@
 
 
 
-#define TEST_AUTOMATIC_NODE_POLLING
-//#define TEST_REQUEST_BUILDER
-//#define TEST_UNICAST_TO_NODE
-//#define TEST_BROADCAST_TO_ALL_NODE
-//#define TEST_OTA_UPDATE
-//#define TEST_LOAD_EXTERNAL_FILES_DEFINITION
+#define TEST_AUTOMATIC_NODE_POLLING true
+#define TEST_REQUEST_BUILDER false
+#define TEST_UNICAST_TO_NODE false
+#define TEST_BROADCAST_TO_ALL_NODE false
+#define TEST_LOAD_EXTERNAL_FILES_DEFINITION false
 
+//Test of update of firmware radio or virtual machine of the radio
+#define TEST_OTA_UPDATE false
+#define TEST_LOCAL false
+#define TEST_REMOTE true
 
 Spidermesh smk900;
 
@@ -56,12 +59,13 @@ void CallbackAutoPolling(mesh_t::iterator pNode, apiframe packet, bool success, 
 {
 	//in case was unable to reach node, action can be done here
 	//payload contain nothing if unable to reach node
-
 	if(!success) 
 	{
 		Serial.print("Timeout: Unable to reach node: ");
 		Serial.println(pNode->second.getMacAsString());
 	}
+
+	//Node reachable
 	else
 	{
 		//to know who trigger the callback	and what is his type	
@@ -84,7 +88,7 @@ void CallbackAutoPolling(mesh_t::iterator pNode, apiframe packet, bool success, 
 	Serial.print("_____________________________________________\n\n");
 }
 
-#ifdef TEST_REQUEST_BUILDER
+#if TEST_REQUEST_BUILDER
 //Before every automatic polling request of nodes, RF payload can be customized with this function.
 //if the function is not defined or if it return nothing, default status command will be sent
 apiframe CallbackAutoRequestBuilder(mesh_t::iterator pNode)
@@ -96,7 +100,7 @@ apiframe CallbackAutoRequestBuilder(mesh_t::iterator pNode)
 }
 #endif
 
-#ifdef TEST_LOAD_EXTERNAL_FILES_DEFINITION
+#if TEST_LOAD_EXTERNAL_FILES_DEFINITION
 // At the end of the initialisation of the smk900.begin, initialisation files can be fetch 
 // from external source, instead of SPIFFS 
 // If the following callback is define and set with smk900.setCallbackLoadExternalParamFiles
@@ -112,10 +116,25 @@ void CallbackLoadExternalFileDefinition()
 	// example of loading nodes list available and the types, 
 	// it can be fetch from any kind database accessible with http or mqtt
 	// you can use the mac gateway to identify the list of nodes and types to fetch
-	//smk900.nodes.loadNodes("{\"0.0.172.51\":{\"name\":\"Office1\",\"type\":\"vacuum\"},\"0.0.172.52\":{\"name\":\"Office2\",\"type\":\"vacuum\"},\"0.0.64.62\":{\"name\":\"Office3\",\"type\":\"vacuum\"}}");
+	smk900.nodes.loadNodes("{	\"0.0.172.51\":{\"name\":\"Office1\",\"type\":\"vacuum\"}, \
+								\"0.0.172.52\":{\"name\":\"Office2\",\"type\":\"vacuum\"}, \
+								\"0.0.64.62\":{\"name\":\"Office3\",\"type\":\"vacuum\"}}");
 
-	//loading of all the type available
-	//smk900.nodes.loadTypes("{\"vacuum\":{\"parser\":{\"status\":{\"params\":{\"rssi\":{\"pos\":[0,8]},\"vacuum\":{\"pos\":[8,16]},\"temperature\":{\"pos\":[24,8]},\"volt\":{\"pos\":[32,8]}}}}}}");
+	//loading of all the type available (JSON formated for c++, \" -> " and eol need \ )
+	smk900.nodes.loadTypes("{	\"vacuum\": \
+									{\"parser\": \
+										{\"status\": \
+											{\"params\": \
+												{ \
+													\"rssi\":{\"pos\":[0,8]}, \
+													\"vacuum\":{\"pos\":[8,16]}, \
+													\"temperature\":{\"pos\":[24,8]}, \
+													\"volt\":{\"pos\":[32,8]} \
+												} \
+											} \
+										} \
+									} \
+								}");
 
 	//loading of one type at the time
 	//smk900.nodes.addType("vacuum", "{\"parser\":{\"status\":{\"params\":{\"rssi\":{\"pos\":[0,8]},\"vacuum\":{\"pos\":[8,16]},\"temperature\":{\"pos\":[24,8]},\"volt\":{\"pos\":[32,8]}}}}}");
@@ -132,29 +151,29 @@ void setup()
 
 	//set the mesh network speed at those parameters
 	int nb_hops = 14;
-	int duty_cycle = 5;
+	int duty_cycle = 20;
 	int nb_byte_per_packet = 20;
 
 
 	//callback that will be call at every packet received
 	smk900.setWhenPacketReceived(CallbackWhenPacketReceived);
 
-	#ifdef TEST_AUTOMATIC_NODE_POLLING
+	#if TEST_AUTOMATIC_NODE_POLLING
 	smk900.setCallbackAutomaticPolling(CallbackAutoPolling);
 	#endif
 
-	#if defined(TEST_REQUEST_BUILDER) && defined(TEST_AUTOMATIC_NODE_POLLING)
+	#if TEST_REQUEST_BUILDER && TEST_AUTOMATIC_NODE_POLLING
 	smk900.setCallbackAutoRequestBuilder(CallbackAutoRequestBuilder);
 	#endif
 
 
 	//will start autopolling nodes listed in nodes.json file
 	//if will send RF command to the virtual machine of each nodes and will use cbAutomaticPolling when contacted or unable to reach node
-	#if !defined(TEST_OTA_UPDATE) && defined(TEST_AUTOMATIC_NODE_POLLING)
+	#if !TEST_OTA_UPDATE && TEST_AUTOMATIC_NODE_POLLING
 	smk900.enableAutomaticPolling();
 	#endif
 
-	#ifdef TEST_LOAD_EXTERNAL_FILES_DEFINITION
+	#if TEST_LOAD_EXTERNAL_FILES_DEFINITION
 	smk900.setCallbackLoadExternalParamFiles(CallbackLoadExternalFileDefinition);
 	#endif
 
@@ -176,23 +195,21 @@ bool update_once = false;
 
 void loop()
 {
-	#ifdef TEST_OTA_UPDATE
-	//#define TEST_LOCAL
-	#define TEST_REMOTE
+	#if TEST_OTA_UPDATE
 
 	if(smk900.isMode(READY) && smk900.isState(IDLE) && !update_once)
 	{
 		update_once = true;
 		smk900.nodes.resetOtaActiveFlags();
 		
-		#ifdef TEST_LOCAL
+		#if TEST_LOCAL
 		uint32_t gateway;
 		macStringToInt("0.0.64.61",&gateway);
 		smk900.nodes.enableOta(gateway);
 		#endif
 
 		//update all node including the gateway radio
-		#ifdef TEST_REMOTE
+		#if TEST_REMOTE
 		for(auto n:smk900.nodes.pool)
 		{
 			if(n.second.local) continue; //for now, gateway and node are updated separately
@@ -208,16 +225,16 @@ void loop()
 	#endif
 	
 
-	#ifdef TEST_BROADCAST_TO_ALL_NODE
+	#if TEST_BROADCAST_TO_ALL_NODE
 	//broadcast to all node variable 1 every 15min, will be sent at the next available broadcast cycle
 	if(millis()-last_broadcast > 15000){
-		Serial.println("Broadcast message");
+		Serial.println("----------------------------------------------Broadcast message----------------------------------------------");
 		smk900.addApiPacket({0x0C,0x00,0x4E,0x01}); 
 		last_broadcast = millis();
 	}
 	#endif
 
-	#ifdef TEST_UNICAST_TO_NODE
+	#if TEST_UNICAST_TO_NODE
 	//unicast to single node every 1min, will be sent at the next available broadcast cycle
 	if(millis()-last_command > 10000){
 		Serial.println("Unicast message");
