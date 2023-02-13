@@ -505,7 +505,15 @@ bool SpidermeshApi::sendNextPacketBuffered()
             //Serial.printf("writeAndExpectList.size():%d\r\n",writeAndExpectList.size());
             MeshRequest_t req = writeAndExpectList.front();
             writeAndExpectList.pop_front();
+            cmd = req.payload;
             WriteAndExpectAnwser(req.pNode, req.payload, PACKET_VM_RESP, req.tag, req.callback);
+        }
+
+        if(show_apipkt_out)
+        {
+            String prefix = "  out: ";
+            if(cmd[5] == 0x4E) prefix = "  broadcast: ";
+            printApiPacket(cmd, prefix);
         }
 
         ret = true;
