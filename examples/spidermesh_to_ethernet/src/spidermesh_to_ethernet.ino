@@ -93,19 +93,6 @@ void WiFiEvent(WiFiEvent_t event)
     }
 }
 
-/**
- * @brief Configure the ethernet parameter
- * 
- */
-void initEthernet()
-{
-    //ETH.begin always before ETH.config
-	Serial.println("ETH BEGIN");
-    ETH.begin(ETH_ADDR, ETH_POWER_PIN, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_TYPE, ETH_CLK_MODE); 
-	ETH.config(eth_add,eth_gat,eth_msk,eth_dns1,eth_dns2);
-	Serial.println("ETH END");
-}
-
 void setup()
 {
 	Serial.begin(115200);
@@ -120,30 +107,6 @@ void setup()
 	int duty_cycle = 5;
 	int nb_byte_per_packet = 20;
 
-
-	//callback that will be call at every packet received
-	//smk900.setWhenPacketReceived(CallbackWhenPacketReceived);
-
-	#ifdef TEST_AUTOMATIC_NODE_POLLING
-	smk900.setCallbackAutomaticPolling(CallbackAutoPolling);
-	#endif
-
-	#if defined(TEST_REQUEST_BUILDER) && defined(TEST_AUTOMATIC_NODE_POLLING)
-	smk900.setCallbackAutoRequestBuilder(CallbackAutoRequestBuilder);
-	#endif
-
-
-	//will start autopolling nodes listed in nodes.json file
-	//if will send RF command to the virtual machine of each nodes and will use cbAutomaticPolling when contacted or unable to reach node
-	#if !defined(TEST_OTA_UPDATE) && defined(TEST_AUTOMATIC_NODE_POLLING)
-	smk900.enableAutomaticPolling();
-	#endif
-
-	#ifdef TEST_LOAD_EXTERNAL_FILES_DEFINITION
-	smk900.setCallbackLoadExternalParamFiles(CallbackLoadExternalFileDefinition);
-	#endif
-
-
 	//to check or not all transaction with smk900 module
 	smk900.setApiMsgFlag(false,true,false); 
 
@@ -153,7 +116,11 @@ void setup()
     // Bridge TCP to Serial API
 	WiFi.onEvent(WiFiEvent);
 
-	initEthernet();
+
+    //ETH.begin always before ETH.config
+    ETH.begin(ETH_ADDR, ETH_POWER_PIN, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_TYPE, ETH_CLK_MODE); 
+	ETH.config(eth_add,eth_gat,eth_msk,eth_dns1,eth_dns2);
+
     bridge.cbAddPacketToSmkTxBuffer = static_cast<bool(*)(apiframe)> (smk900.addApiPacketLowPriority);
 	if(!smk900.show_apipkt_in)    		
         bridge.cbWhenSmkPacketReceived = static_cast<void(*)(apiframe, String)> (printApiPacket);
@@ -168,32 +135,27 @@ void setup()
         smk900.setAutoPolling(prevPollMode);            
     };
 
-    smk900.cbWhenPacketReceived=WhenPacketReceived;
+    /*
+        This function allow to put packet received from spidermesh network into a list.
+        It will be processed in the taskloop function    
+    */
+    smk900.cbWhenPacketReceived= std::function<void(apiframe)> ([&] (apiframe pkt)
+    {
+        if(smk900.isInitDone())
+        {
+            //bridge.WhenNewSmkPacketRx(packet);
+            if(bridge.state == CONNECTED)
+            {
+                taskENTER_CRITICAL(&mmux);
+                bridge.packetList.push_back(pkt);
+                taskEXIT_CRITICAL(&mmux);
+            }
+        }         
+    });
     bridge.init();
-
 }
 
 void loop()
 {
 	bridge.taskloop();
-}
-
-/**
- * @brief This function allow to put packet received from spidermesh network into a list.
- *        It will be processed in the taskloop function
- * 
- * @param packet complete api frame received from spidermesh
- */
-void WhenPacketReceived(apiframe packet)
-{
-    if(smk900.isInitDone())
-    {
-     	//bridge.WhenNewSmkPacketRx(packet);
-		if(bridge.state == CONNECTED)
-        {
-            taskENTER_CRITICAL(&mmux);
-			bridge.packetList.push_back(packet);
-            taskEXIT_CRITICAL(&mmux);
-        }
-    }  
 }
