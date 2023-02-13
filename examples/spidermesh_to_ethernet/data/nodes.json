@@ -1,0 +1,26 @@
+{
+    "0.0.0.1": {
+        "name": "Location 1",
+        "type": "repeater"
+    },
+    "0.0.0.2": {
+        "name": "Location 2",
+        "type": "repeater"
+    },
+    "0.0.0.3": {
+        "name": "Location 3",
+        "type": "repeater"
+    },
+    "0.0.1.1": {
+        "name": "Repeater 4",
+        "type": "repeater"
+    },           
+    "0.0.1.2": {
+        "name": "Repeater 5",
+        "type": "repeater"
+    },           
+    "0.0.1.3": {
+        "name": "Repeater 6",
+        "type": "repeater"
+    }        
+}
