@@ -322,7 +322,6 @@ bool SpidermeshApi::parseReceivedData()
 
                     if(show_apipkt_in && !isEobPacket(current_packet))printApiPacket(current_packet, PREFIX_IN);
                     CheckIfAnswerWasExpectedAndCallSuccessFunction(current_packet);
-                    cbWhenPacketReceived(current_packet);
                     //IS EOB
                     if(isEobPacket(current_packet))
                     {
@@ -340,6 +339,8 @@ bool SpidermeshApi::parseReceivedData()
                     
                         delay(100);
                     }
+
+                    cbWhenPacketReceived(current_packet); //for user purpose
 
                   #if TERMINAL_ENABLED
                     AddToTerminalBuffer("in :", &current_packet);
