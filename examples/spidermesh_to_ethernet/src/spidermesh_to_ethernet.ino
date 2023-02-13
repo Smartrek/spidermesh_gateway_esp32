@@ -32,7 +32,11 @@ bool addApiPacket(apiframe pkt);
 portMUX_TYPE mmux = portMUX_INITIALIZER_UNLOCKED;
 
 
-//---------------------------------------------------------------------------------------
+/**
+ * @brief Management of event from the Wifi and Ethernet module
+ * 
+ * @param event code of the event
+ */
 void WiFiEvent(WiFiEvent_t event)
 {
 
@@ -89,7 +93,10 @@ void WiFiEvent(WiFiEvent_t event)
     }
 }
 
-
+/**
+ * @brief Configure the ethernet parameter
+ * 
+ */
 void initEthernet()
 {
     //ETH.begin always before ETH.config
@@ -147,7 +154,7 @@ void setup()
 	WiFi.onEvent(WiFiEvent);
 
 	initEthernet();
-    bridge.cbAddPacketToSmkTxBuffer = addApiPacket;
+    bridge.cbAddPacketToSmkTxBuffer = static_cast<bool(*)(apiframe)> (smk900.addApiPacketLowPriority);
 	if(!smk900.show_apipkt_in)    		
         bridge.cbWhenSmkPacketReceived = static_cast<void(*)(apiframe, String)> (printApiPacket);
     
@@ -171,14 +178,12 @@ void loop()
 	bridge.taskloop();
 }
 
-bool addApiPacket(apiframe pkt)
-{
-    smk900.addApiPacketLowPriority(pkt);
-    return true;
-}
-
-
-
+/**
+ * @brief This function allow to put packet received from spidermesh network into a list.
+ *        It will be processed in the taskloop function
+ * 
+ * @param packet complete api frame received from spidermesh
+ */
 void WhenPacketReceived(apiframe packet)
 {
     if(smk900.isInitDone())
