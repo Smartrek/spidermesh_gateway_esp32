@@ -319,11 +319,11 @@ bool SpidermeshApi::parseReceivedData()
                     #if SHOW_RECEIVED_BYTE_FROM_SMK900
                         Serial.println();
                     #endif
-
-                    if(show_apipkt_in && !isEobPacket(current_packet))printApiPacket(current_packet, PREFIX_IN);
+                    bool iseob = isEobPacket(current_packet);
+                    if(show_apipkt_in && !iseob || show_eob) printApiPacket(current_packet, PREFIX_IN);
                     CheckIfAnswerWasExpectedAndCallSuccessFunction(current_packet);
                     //IS EOB
-                    if(isEobPacket(current_packet))
+                    if(iseob)
                     {
                         eob_cnt++; //counter manage at higher level
                       #if PRINT_EOB_AS_DOT
@@ -336,11 +336,9 @@ bool SpidermeshApi::parseReceivedData()
                         WhenEobIsReceived(true);
 
                         if(show_eob)printApiPacket(current_packet, PREFIX_IN);
-                    
-                        delay(100);
                     }
-
                     cbWhenPacketReceived(current_packet); //for user purpose
+                    if(iseob) delay(100);                 //delay for other thread
 
                   #if TERMINAL_ENABLED
                     AddToTerminalBuffer("in :", &current_packet);
