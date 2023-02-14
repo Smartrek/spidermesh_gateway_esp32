@@ -612,7 +612,10 @@ bool Spidermesh::ProcessState(bool eob)
 							nodes.pool.clear(); 
 							nodes.add(a, "gateway", LOCAL, "main", "main gateway");
 							gateway=nodes.pool.begin();
-							if(cbLoadExternalParamFiles) cbLoadExternalParamFiles();
+							if(cbLoadExternalParamFiles){
+								cbLoadExternalParamFiles();
+								dumpReceivedBuffer();
+							} 
 							else{
 								nodes.loadParamFiles();
 							} 
