@@ -21,8 +21,6 @@ JsonObject Spidermesh::log;
 String Spidermesh::otaResult;
 bool Spidermesh::initDone=false;
 
-MeshParam Spidermesh::actualMeshSpeed;
-MeshParam Spidermesh::requiredMeshSpeed;
 
 hw_timer_t* Spidermesh::watchdogPortia;
 bool Spidermesh::interruptResetPortiaFlag=false;

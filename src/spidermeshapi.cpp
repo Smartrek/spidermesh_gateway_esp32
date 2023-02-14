@@ -54,7 +54,12 @@ commandList_t SpidermeshApi::highPriorityFifoCommandList;
 bool SpidermeshApi::show_eob = false;
 bool SpidermeshApi::show_apipkt_in = false;
 bool SpidermeshApi::show_apipkt_out = false;
-    
+
+
+MeshParam SpidermeshApi::actualMeshSpeed;
+MeshParam SpidermeshApi::requiredMeshSpeed;
+uint64_t SpidermeshApi::timeCallbackUser;
+
 HardwareSerial SpidermeshApi::smkport(2);
 
 SpidermeshApi::SpidermeshApi()
@@ -337,8 +342,10 @@ bool SpidermeshApi::parseReceivedData()
 
                         if(show_eob)printApiPacket(current_packet, PREFIX_IN);
                     }
+                    timeCallbackUser = millis();
                     cbWhenPacketReceived(current_packet); //for user purpose
-                    if(iseob) delay(100);                 //delay for other thread
+                    timeCallbackUser = millis() - timeCallbackUser; 
+                    if(iseob) OptimalDelay();                 //delay for other thread
 
                   #if TERMINAL_ENABLED
                     AddToTerminalBuffer("in :", &current_packet);
@@ -372,6 +379,39 @@ bool SpidermeshApi::parseReceivedData()
         }
     }
     return ret;
+}
+
+
+//------------------------------------------------------------------------------------------------
+void SpidermeshApi::OptimalDelay()
+{
+    int tBroadcast = 10 * (actualMeshSpeed.hop * (actualMeshSpeed.bo + actualMeshSpeed.bi) + actualMeshSpeed.rde *actualMeshSpeed.rd);
+    int tInterval = tBroadcast * actualMeshSpeed.duty;
+    int tSleep = tInterval - tBroadcast;
+
+    int secureSleep = tSleep -100 - timeCallbackUser;
+    if(secureSleep<0){
+        Serial.println("Warning, callback function take too much time!");
+        secureSleep = 10;
+    } 
+
+    #if 0
+        char msg[100];
+        sprintf(msg, "Bo:%d\nBi:%d\nHops:%d\nR:%d\nRe:%d\nDuty:%d\n",actualMeshSpeed.bo,actualMeshSpeed.bi,actualMeshSpeed.hop,actualMeshSpeed.rde,actualMeshSpeed.rd,actualMeshSpeed.duty);
+        Serial.print(msg);
+
+        Serial.print("tBroadcast:");
+        Serial.println(tBroadcast);
+        Serial.print("tInterval:");
+        Serial.println(tInterval);
+        Serial.print("tSleep:");
+        Serial.println(tSleep);
+        Serial.print("secureSleep:");
+        Serial.println(secureSleep);
+    #endif
+
+    delay(secureSleep);
+
 }
 
 

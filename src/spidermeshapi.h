@@ -167,6 +167,17 @@ public:
 	};
 };
 
+class MeshParam
+{
+public:
+	uint8_t bo, bi, hop, rd, rde, duty; // reg 2
+	uint8_t rf_speed;					// reg 11
+	MeshParam(){
+		bo=-1;bi=-1;hop=-1,rd=-1,rde=-1,duty=-1,rf_speed=-1;
+	};
+};
+
+
 //--------------------------------------------------------------------------
 
 class SpidermeshApi
@@ -180,6 +191,14 @@ private:
 
 	static portMUX_TYPE mutexExpect;
 
+
+protected:
+	static MeshParam actualMeshSpeed;
+	static MeshParam requiredMeshSpeed;	
+
+private:
+	static void OptimalDelay();
+	static uint64_t timeCallbackUser;   
 
 public:
 	static ExpectCallback cbAutomaticPolling;
