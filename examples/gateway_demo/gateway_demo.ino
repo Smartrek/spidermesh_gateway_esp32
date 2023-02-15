@@ -186,7 +186,7 @@ void setup()
 
 	//if there is a need to change channel, use this function to launch the sequence
 	//note that a reset and a write to eeprom will be perform so use this function only when needed, do not use by default
-	//smk900.setChannelSequence(1);
+	//smk900.sendChannelSequence(1);
 }
 
 uint64_t last_broadcast=millis();

@@ -245,10 +245,13 @@ apiframe SpidermeshApi::requestMacAddress()
 void SpidermeshApi::task()
 {
     //manage serial port reception
-    if(!parseReceivedData()) delay(10);
+    if(!parseReceivedData());
 
 
 }
+
+
+
 
 //------------------------------------------------------------------------------------------------
 void SpidermeshApi::initWatchdogParser()
@@ -385,35 +388,64 @@ bool SpidermeshApi::parseReceivedData()
 //------------------------------------------------------------------------------------------------
 void SpidermeshApi::OptimalDelay()
 {
-    int tBroadcast = 10 * (actualMeshSpeed.hop * (actualMeshSpeed.bo + actualMeshSpeed.bi) + actualMeshSpeed.rde *actualMeshSpeed.rd);
-    int tInterval = tBroadcast * actualMeshSpeed.duty;
-    int tSleep = tInterval - tBroadcast;
+    if(actualMeshSpeed.hop != 0)
+    {
 
-    int secureSleep = tSleep -100 - timeCallbackUser;
-    if(secureSleep<0){
-        Serial.println("Warning, callback function take too much time!");
-        secureSleep = 10;
-    } 
+        int tBroadcast;
+        int tInterval;
+        int tSleep;
+        TimmingMeshCalculator(&tBroadcast, &tInterval, &tSleep);
 
-    #if 0
-        char msg[100];
-        sprintf(msg, "Bo:%d\nBi:%d\nHops:%d\nR:%d\nRe:%d\nDuty:%d\n",actualMeshSpeed.bo,actualMeshSpeed.bi,actualMeshSpeed.hop,actualMeshSpeed.rde,actualMeshSpeed.rd,actualMeshSpeed.duty);
-        Serial.print(msg);
+        int secureSleep = tSleep -100 - timeCallbackUser;
 
-        Serial.print("tBroadcast:");
-        Serial.println(tBroadcast);
-        Serial.print("tInterval:");
-        Serial.println(tInterval);
-        Serial.print("tSleep:");
-        Serial.println(tSleep);
-        Serial.print("secureSleep:");
-        Serial.println(secureSleep);
-    #endif
+        if(secureSleep<0){
+            Serial.println("Warning, callback function take too much time!");
+            secureSleep = 10;
+        } 
+        if(secureSleep >60000) secureSleep = 60000;
 
-    delay(secureSleep);
+        #if 1
+            /*
+            char msg[100];
+            sprintf(msg, "Bo:%d\nBi:%d\nHops:%d\nR:%d\nRe:%d\nDuty:%d\n",actualMeshSpeed.bo,actualMeshSpeed.bi,actualMeshSpeed.hop,actualMeshSpeed.rde,actualMeshSpeed.rd,actualMeshSpeed.duty);
+            Serial.print(msg);
+
+            Serial.print("tBroadcast:");
+            Serial.println(tBroadcast);
+            Serial.print("tInterval:");
+            Serial.println(tInterval);
+            Serial.print("tSleep:");
+            Serial.println(tSleep);*/
+            Serial.print("  secureSleep:");
+            Serial.println(secureSleep);
+            Serial.print("  timeCallbackUser:");
+            Serial.println(timeCallbackUser);
+        #endif
+
+        delay(secureSleep);
+    }
+    else
+    {
+        delay(100);
+    }
+    
 
 }
 
+//------------------------------------------------------------------------------------------------
+bool SpidermeshApi::TimmingMeshCalculator(int* tbroadcat, int* tinterval, int* tsleep)
+{
+    bool ret = false;
+    if(actualMeshSpeed.hop != 0)
+    {
+
+        *tbroadcat = 10 * (actualMeshSpeed.hop * (actualMeshSpeed.bo + actualMeshSpeed.bi) + actualMeshSpeed.rde *actualMeshSpeed.rd);
+        *tinterval = *tbroadcat * actualMeshSpeed.duty;
+        *tsleep = *tinterval - *tbroadcat;
+        ret = true;
+    }
+    return ret;
+}
 
 //------------------------------------------------------------------------------------------------
 void SpidermeshApi::parseApiFromHost(uint8_t* buf, uint16_t len)

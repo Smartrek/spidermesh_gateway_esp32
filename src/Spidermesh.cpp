@@ -34,13 +34,20 @@ std::function<void()> Spidermesh::cbLoadExternalParamFiles;
 portMUX_TYPE Spidermesh::mutexWebServer;
 
 
-void Spidermesh::begin(int hop, int duty, int rf_speed, uint64_t timeout)
+void Spidermesh::begin(int hop, int duty, int rf_speed, int bo, int bi, int redux, int redux_en, uint64_t timeout)
 {
 
     if(hop>=5 && hop<31) requiredMeshSpeed.hop = hop;
     if(duty==5 || duty==10 || duty==20 || duty==40 || duty==80 || duty==160) requiredMeshSpeed.duty = duty;
     if(rf_speed==20) requiredMeshSpeed.rf_speed = PRESET_20B;
     if(rf_speed==72) requiredMeshSpeed.rf_speed = PRESET_72B;
+
+
+	requiredMeshSpeed.bo = (bo>=1 && bo<=4) ? bo: 1;
+	requiredMeshSpeed.bi = (bi>=1 && bi<=4) ? bo: 1;
+	requiredMeshSpeed.rd = redux;
+	requiredMeshSpeed.rde = redux_en;
+	
 
 
     mutexWebServer = portMUX_INITIALIZER_UNLOCKED;
@@ -352,31 +359,14 @@ bool Spidermesh::isDynOptimalUpdateSpeed()
 {
 	bool ret = true;
 
-	uint8_t h = readFile("/hops").toInt();
-	if (h == 0)
-		h = 15;
-	uint8_t d = readFile("/duty").toInt();
-	if (d == 0)
-		d = 5;
+	if (actualMeshSpeed.bo != requiredMeshSpeed.bo) 	ret = false;
+	if (actualMeshSpeed.bi != requiredMeshSpeed.bi) 	ret = false;
+	if (actualMeshSpeed.hop != requiredMeshSpeed.hop) 	ret = false;
+	if (actualMeshSpeed.rd != requiredMeshSpeed.rd) 	ret = false;
+	if (actualMeshSpeed.rde != requiredMeshSpeed.rde) 	ret = false;
+	if (actualMeshSpeed.duty != requiredMeshSpeed.duty) 	ret = false;
 
-
-	//if specified by user with begin function
-	if(requiredMeshSpeed.hop != -1 && requiredMeshSpeed.duty != -1)
-	{
-		actualMeshSpeed.hop = requiredMeshSpeed.hop;
-		h = requiredMeshSpeed.hop;
-		actualMeshSpeed.duty =requiredMeshSpeed.duty;
-		d=requiredMeshSpeed.duty;
-		ret = false;
-	}			
-
-	if (actualMeshSpeed.bo != 1) 	ret = false;
-	if (actualMeshSpeed.bi != 1) 	ret = false;
-	if (actualMeshSpeed.hop != h) 	ret = false;
-	if (actualMeshSpeed.rd != 1) 	ret = false;
-	if (actualMeshSpeed.rde != 0) 	ret = false;
-	if (actualMeshSpeed.duty != d) 	ret = false;
-
+	Serial.println("  is mesh speed is ok: " + String(ret));
 	return ret;
 };    
 
@@ -395,7 +385,7 @@ void Spidermesh::logJson(String msg)
  * @return true 
  * @return false 
  */
-bool Spidermesh::setChannelSequence(int channel, uint64_t timeout)
+bool Spidermesh::sendChannelSequence(int channel, uint64_t timeout)
 {
 	bool ch_ok = false;
 
@@ -421,12 +411,47 @@ bool Spidermesh::setChannelSequence(int channel, uint64_t timeout)
 			}
 			delay(100);
 		}
-		Serial.println("setChannelSequence out");
 		delay(1000);
 	}
 	else PRTLN("** error: channel invalide");
 
 	return ch_ok;	
+}
+
+void Spidermesh::sendConfigDynSequence(uint8_t bo, uint8_t bi,uint8_t hop, uint8_t rdx, uint8_t rde, uint8_t duty, uint64_t timeout) 
+{
+    // build frame pour changer le mesh speed, 
+    auto p = setDyn(bo,bi,hop,rdx,rde,duty);
+
+
+    requiredMeshSpeed.bo=bo;
+    requiredMeshSpeed.bi=bi;
+    requiredMeshSpeed.hop=hop;
+    requiredMeshSpeed.rd=rdx;
+    requiredMeshSpeed.rde=rde;
+    requiredMeshSpeed.duty=duty;
+
+
+	bool poll = getAutoPolling();
+	setAutoPolling(false);
+
+	setMode(CHANGE_DYN);
+	setState(GET_SPEED_DYN);
+
+	uint64_t timeout_end = millis()+timeout;
+	bool timeout_flag = false;
+	while(!isReady() && !timeout_flag) 
+	{
+		if(millis() > timeout_end)
+		{
+			timeout_flag = true;
+			Serial.println("--> TIMEOUT <--");
+		}
+		delay(100);
+	}
+	delay(1000);
+	setAutoPolling(poll);
+
 }
 
 void Spidermesh::debugStateMachine()
@@ -671,6 +696,11 @@ bool Spidermesh::ProcessState(bool eob)
             resetOtaTimeout();
 
 			if(!isDynOptimalUpdateSpeed()) setState(SET_SPEED_DUTY);
+			else if(isMode(CHANGE_DYN))
+			{
+                setMode(READY);
+                setState(IDLE);
+			}
 			else setState(GET_SPEED_RF);
 		}));
 
@@ -681,35 +711,35 @@ bool Spidermesh::ProcessState(bool eob)
 		PRTLN("\n--> SET_SPEED_DYN");
 		log[String(millis())] = "SET_SPEED_DYN";
 		setOtaTimeout(60000);
-
+		/*
 		uint8_t h = readFile("/hops").toInt();
 		if (h == 0) h = 8;
 		uint8_t d = readFile("/duty").toInt();
 		if (d == 0)	d = 5;
-
+		*/
 
 		//if specified by user with begin function
-		if(requiredMeshSpeed.hop != -1 && requiredMeshSpeed.duty != -1 && isMode(INIT_SMK900))
-		{
-			actualMeshSpeed.hop = requiredMeshSpeed.hop;
-			h = requiredMeshSpeed.hop;
-			actualMeshSpeed.duty =requiredMeshSpeed.duty;
-			d=requiredMeshSpeed.duty;
-		}
 
 		setState(WAIT);
-		apiframe cmd = apiPacket(0x0A, {actualMeshSpeed.bo, actualMeshSpeed.bi, h, actualMeshSpeed.rd, actualMeshSpeed.rde, d}, LOCAL); // ret reg 2 DYN
+		apiframe cmd = apiPacket(0x0A, {requiredMeshSpeed.bo, requiredMeshSpeed.bi, requiredMeshSpeed.hop, requiredMeshSpeed.rd, requiredMeshSpeed.rde, requiredMeshSpeed.duty}, LOCAL); // ret reg 2 DYN
 		WriteAndExpectAnwser(gateway, cmd, 0x1A, "setspeed",ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																		{
+			PRT("\n-->SET_SPEED_DYN ");
 			//TIMEOUT
 			if(!success) {
-				pNode->second.otaStep = STEP_FAILED;
-				PRTLN("  Unable to set speed dyn"); return; 
+				PRTLN(" failed"); return; 
 			}
+			PRTLN(" succeed");
 			log[String(millis())] = "--OK";
-		
+
+			actualMeshSpeed = requiredMeshSpeed;
 			//SUCESS
-			setState(GET_SPEED_RF);
+			if(isMode(CHANGE_DYN))
+			{
+                setMode(READY);
+                setState(IDLE);
+			}
+			else setState(GET_SPEED_RF);
 			
 			resetOtaTimeout();
 		}));

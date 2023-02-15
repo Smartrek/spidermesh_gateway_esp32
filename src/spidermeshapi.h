@@ -170,10 +170,10 @@ public:
 class MeshParam
 {
 public:
-	uint8_t bo, bi, hop, rd, rde, duty; // reg 2
-	uint8_t rf_speed;					// reg 11
+	byte bo, bi, hop, rd, rde, duty; // reg 2
+	byte rf_speed;					// reg 11
 	MeshParam(){
-		bo=-1;bi=-1;hop=-1,rd=-1,rde=-1,duty=-1,rf_speed=-1;
+		bo=0;bi=0;hop=0,rd=0,rde=0,duty=0,rf_speed=0;
 	};
 };
 
@@ -190,11 +190,12 @@ private:
 	static HardwareSerial smkport;
 
 	static portMUX_TYPE mutexExpect;
-
+	
 
 protected:
 	static MeshParam actualMeshSpeed;
 	static MeshParam requiredMeshSpeed;	
+	static bool TimmingMeshCalculator(int* tbroadcat, int* tinterval, int* tsleep);
 
 private:
 	static void OptimalDelay();
@@ -235,6 +236,7 @@ public:
 	static void reset();
 
 	static void initRegister();
+	
 
 private:
 

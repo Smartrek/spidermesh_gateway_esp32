@@ -62,6 +62,7 @@ enum ota_mode_t
 	WAITING,
 	INIT_SMK900,
 	CONFIG_SMK900,
+	CHANGE_DYN,
 	READ_VERSION_SMK900,
 	READ_VERSION_HOST,
 	READY,
@@ -187,7 +188,7 @@ class Spidermesh : public SpidermeshApi
 
 
 public:
-	void begin(int hop=-1, int duty=-1, int rf_speed=-1, uint64_t timeout = DEFAULT_TIMEOUT);	
+	void begin(int hop=15, int duty=5, int rf_speed=20, int bo=1, int bi=1, int redux=1, int redux_en=0, uint64_t timeout = DEFAULT_TIMEOUT);	
     static void task();
     static bool findNextNode(bool initSearch=false, bool otaActiveOnly=false);
 	static void debugStateMachine();
@@ -262,7 +263,8 @@ public:
 	static void setCallbackLoadExternalParamFiles(std::function<void()> fn){cbLoadExternalParamFiles=fn;};
 
 
-	static bool setChannelSequence(int channel, uint64_t timeout=DEFAULT_TIMEOUT);
+	static bool sendChannelSequence(int channel, uint64_t timeout=DEFAULT_TIMEOUT);
+	static void sendConfigDynSequence(uint8_t po, uint8_t pi,uint8_t hop, uint8_t rdx, uint8_t rde, uint8_t duty, uint64_t timeout = 60000);
 
 	
 };
