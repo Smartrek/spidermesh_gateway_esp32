@@ -8,6 +8,9 @@
 #define ESP32_SMG
 
 
+#define THREAD_PRIORITY_SMK900 4
+#define THREAD_DELAY_WINDOW 100
+
 #define ETHERNET_ENABLE true
 #define WIFI_ACCESS_POINT true
 
@@ -44,7 +47,7 @@
 
 
 
-#define MODBUS_RTU 0
+
 #define MODBUS_REGISTER_ENABLED false
 
 #define MQTT_PARSER_ENABLED true

@@ -32,6 +32,9 @@ int Spidermesh::sim_skip_first_packet;
 std::function<void()> Spidermesh::cbLoadExternalParamFiles;
 
 portMUX_TYPE Spidermesh::mutexWebServer;
+#ifndef THREAD_PRIORITY_SMK900
+	#define THREAD_PRIORITY_SMK900 4
+#endif
 
 
 void Spidermesh::begin(int hop, int duty, int rf_speed, int bo, int bi, int redux, int redux_en, uint64_t timeout)
@@ -58,7 +61,7 @@ void Spidermesh::begin(int hop, int duty, int rf_speed, int bo, int bi, int redu
 		"smkGatewayTaskCore",
 		16384,	/* stack */
 		NULL,	/*  */
-		1,		/* priority */
+		THREAD_PRIORITY_SMK900,		/* priority */
 		&Task1, /*  */
 		1);		/* core # (0-1) arduino loop fn is on core 1 */ 
 

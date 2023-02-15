@@ -2,7 +2,9 @@
 #include "esp32-hal-uart.h"
 #include "soc/uart_struct.h"
 
-
+#ifndef THREAD_DELAY_WINDOW
+	#define THREAD_DELAY_WINDOW 100
+#endif
 
 portMUX_TYPE SpidermeshApi::mutexExpect;
 
@@ -61,6 +63,8 @@ MeshParam SpidermeshApi::requiredMeshSpeed;
 uint64_t SpidermeshApi::timeCallbackUser;
 
 HardwareSerial SpidermeshApi::smkport(2);
+
+
 
 SpidermeshApi::SpidermeshApi()
 {
@@ -396,7 +400,7 @@ void SpidermeshApi::OptimalDelay()
         int tSleep;
         TimmingMeshCalculator(&tBroadcast, &tInterval, &tSleep);
 
-        int secureSleep = tSleep -100 - timeCallbackUser;
+        int secureSleep = tSleep - THREAD_DELAY_WINDOW - timeCallbackUser;
 
         if(secureSleep<0){
             Serial.println("Warning, callback function take too much time!");
