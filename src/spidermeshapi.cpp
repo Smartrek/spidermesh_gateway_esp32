@@ -37,7 +37,7 @@ std::function<bool(bool)> SpidermeshApi::WhenEobIsReceived;
 uint32_t SpidermeshApi::focus_node;
 unsigned long SpidermeshApi::focus_node_start_time;
 uint16_t SpidermeshApi::_duration_focus_on_node_polling;
-bool SpidermeshApi::_otaPacketInCycle;
+
 
 //std::vector <mesh_t::iterator> SpidermeshApi::otaList;
 
@@ -332,26 +332,21 @@ bool SpidermeshApi::parseReceivedData()
                         Serial.println();
                     #endif
                     bool iseob = isEobPacket(current_packet);
-                    if(show_apipkt_in && !iseob || show_eob) printApiPacket(current_packet, PREFIX_IN);
+                    if(show_apipkt_in && !iseob) printApiPacket(current_packet, PREFIX_IN);
                     CheckIfAnswerWasExpectedAndCallSuccessFunction(current_packet);
+
+
+                    timeCallbackUser = millis();
+                    cbWhenPacketReceived(current_packet); //for user purpose
+                    timeCallbackUser = millis() - timeCallbackUser; 
+
                     //IS EOB
                     if(iseob)
                     {
                         eob_cnt++; //counter manage at higher level
-                      #if PRINT_EOB_AS_DOT
-                        Serial.print(".");
-                      #endif                        
-
-                        _otaPacketInCycle = false;
-
                         CheckExpectTimeout();
                         WhenEobIsReceived(true);
-
-                        if(show_eob)printApiPacket(current_packet, PREFIX_IN);
                     }
-                    timeCallbackUser = millis();
-                    cbWhenPacketReceived(current_packet); //for user purpose
-                    timeCallbackUser = millis() - timeCallbackUser; 
                     if(iseob) OptimalDelay();                 //delay for other thread
 
                   #if TERMINAL_ENABLED

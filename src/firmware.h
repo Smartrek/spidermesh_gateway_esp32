@@ -8,6 +8,7 @@
 #include <list>
 #include <utils.h>
 
+
 #define UF2_MAGIC_START 0
 #define OFFSET_BIN_LENGHT 12
 #define OFFSET_SIZE 16

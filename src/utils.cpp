@@ -75,8 +75,10 @@ void printApiPacket(apiframe hcmd, String prefix)
     if(hcmd.size()>0)
     {
         String packet = hexPacketToAscii(hcmd);
+        Serial.printf("%s", KMAG);
         Serial.print(prefix);
         Serial.println(packet);
+        Serial.printf("%s", KNRM);
     }
 }
 

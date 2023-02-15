@@ -106,8 +106,8 @@ void Spidermesh::smkGatewayTaskCore(void *pvParameters)
 
 void Spidermesh::task()
 {
-	SpidermeshApi::task();
     ProcessState(false);
+	SpidermeshApi::task();
 
   #ifdef WATCHDOG_SMK900_ENABLE
     if(interruptResetPortiaFlag)
@@ -485,6 +485,13 @@ bool Spidermesh::ProcessState(bool eob)
 		PRTLN(getState());
 	}
 #endif
+	if(eob && show_eob)
+	{
+		Serial.printf("%s", KMAG);
+		Serial.print("___________________________ END OF BROADCAST CYCLE ___________________________\n\n");
+		Serial.printf("%s", KNRM);
+
+	}
 	if (isState(IDLE))
 	{
 		//for local packet

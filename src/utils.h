@@ -5,6 +5,7 @@
 #include <list>
 #include <vector>
 #include <rom/rtc.h>
+#include <logger.h>
 
 
 union value_converter_union

@@ -396,7 +396,6 @@ protected:
 	static WriteAndExpectList_t writeAndExpectList;
 	static commandList_t lowPriorityFifoCommandList;
 	static commandList_t highPriorityFifoCommandList;
-	static bool _otaPacketInCycle;
 
 	static bool isMessageStackEmpty() { return !(lowPriorityFifoCommandList.size() + highPriorityFifoCommandList.size()); };
 	static apiframe checkNextPacketToSend() { return lowPriorityFifoCommandList.front(); };
