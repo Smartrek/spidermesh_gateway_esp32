@@ -404,7 +404,7 @@ void SpidermeshApi::OptimalDelay()
         } 
         if(secureSleep >60000) secureSleep = 60000;
 
-        #if 1
+        #if 0
             /*
             char msg[100];
             sprintf(msg, "Bo:%d\nBi:%d\nHops:%d\nR:%d\nRe:%d\nDuty:%d\n",actualMeshSpeed.bo,actualMeshSpeed.bi,actualMeshSpeed.hop,actualMeshSpeed.rde,actualMeshSpeed.rd,actualMeshSpeed.duty);
