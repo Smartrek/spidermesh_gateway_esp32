@@ -876,10 +876,15 @@ void SpidermeshApi::CheckExpectTimeout()
                 //retry if less than max allowed and data was valid last time
                 //we don't want to retry if it was already dead and waste time here
                 apiframe dummy = {};
+                PRT(KRED);
+                PRT("Timeout occur for node: ");
+                PRTLN(i->_pNode->second.getMacAsString());
+                PRT(KNRM);
+
                 #if SHOW_EXPECT_EVENT
                 Serial.println("  data validity FALSE <---- " + i->_pNode->second.name);
                 #endif
-                    i->_pNode->second.dataValid=false;
+                i->_pNode->second.dataValid=false;
                 i->_expect_callback(i->_pNode, dummy, false, i->_tag);//if user want to do something
 
                 i=listOfExpectedAnswer.erase(i);
