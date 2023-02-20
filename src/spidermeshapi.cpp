@@ -421,7 +421,21 @@ void SpidermeshApi::OptimalDelay()
             Serial.println(timeCallbackUser);
         #endif
 
-        delay(secureSleep);
+
+        int remaining = secureSleep;
+        do
+        {
+            delay(100);
+            remaining -=100;
+            if(smkport.available())
+            {
+                Serial.print(KRED);
+                Serial.print("  SMK900 received before delay expired. Remaining expected: ");
+                Serial.println(remaining);      
+                Serial.print(KNRM);
+                break;
+            }
+        } while (remaining>0);
     }
     else
     {
