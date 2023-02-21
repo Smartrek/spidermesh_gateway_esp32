@@ -80,6 +80,8 @@ enum ota_state
 
 	/* Depending of the mode, it can go elswhere at the end of this sequence  */
 	INIT_GATEWAY_REGISTER,	  /* 1 EOB                   0  */
+	GET_NODE_TYPE,
+	SET_NODE_TYPE,
 	READ_GW_FIRMWARE,
 	WAIT_CONFIG,
 	GET_SPEED_DYN,	  /* 1 EOB                   0  */
@@ -174,7 +176,7 @@ class Spidermesh : public SpidermeshApi
 	static int sim_skip_first_packet;
 	#endif
 	static String otaResult;
-	static bool initDone;
+	static bool initDoneOnce;
 
 
 
@@ -193,7 +195,7 @@ public:
     static bool findNextNode(bool initSearch=false, bool otaActiveOnly=false);
 	static void debugStateMachine();
     static void init();
-   	static bool isInitDone() { return initDone; };
+   	static bool isInitDone() { return initDoneOnce; };
 	static bool isReady();
 	static bool currentNodeCanBePolled(){return ((pCurrentNode->second.otaStep == STEP_INIT) || (pCurrentNode->second.otaStep == STEP_COMPLETED) || (pCurrentNode->second.otaStep == STEP_FAILED) || (pCurrentNode->second.otaStep == STEP_RETRY) || (pCurrentNode->second.otaStep == STEP_TRANSFERT));};
 

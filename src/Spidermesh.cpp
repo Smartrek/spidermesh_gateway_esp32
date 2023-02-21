@@ -19,7 +19,7 @@ int Spidermesh::wait_eob_count;
 
 JsonObject Spidermesh::log;
 String Spidermesh::otaResult;
-bool Spidermesh::initDone=false;
+bool Spidermesh::initDoneOnce=false;
 
 
 hw_timer_t* Spidermesh::watchdogPortia;
@@ -643,7 +643,7 @@ bool Spidermesh::ProcessState(bool eob)
 						String smac =RepliedMacAddress.toString();
 						uint32_t a = SmkList::macString2Umac(smac);
 
-						if(!initDone)
+						if(!initDoneOnce)
 						{
 							nodes.pool.clear(); 
 							nodes.add(a, "gateway", LOCAL, "main", "main gateway");
@@ -660,14 +660,56 @@ bool Spidermesh::ProcessState(bool eob)
 						}
 						SpidermeshApi::findNext(true,true);
 						//auto g = gateway;
-						initDone = true;
-						setState(READ_GW_FIRMWARE);
+
+						if(initDoneOnce) setState(READ_GW_FIRMWARE);
+						else             setState(GET_NODE_TYPE);
+
+						initDoneOnce = true;
+						
 					}));
                 }));
             })); 
 		}));
 
 		ret = true;
+	}
+	else if (isState(GET_NODE_TYPE))
+	{
+		PRTLN("\n--> GET_NODE_TYPE");
+		setState(WAIT);
+		apiframe cmd = apiPacket(SMK_READ_REG, {1, 7, 1}, LOCAL); // reg preset from ram
+		WriteAndExpectAnwser(gateway, cmd, 0x13, "gettype", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
+		{
+			if(!success) {
+				pNode->second.otaStep = STEP_FAILED;
+					PRTLN("  Unable to get node type"); return; 
+			}
+			if(packet[7]!=0) setState(SET_NODE_TYPE);     //node
+			else			setState(READ_GW_FIRMWARE);  //gateway
+		}));
+		ret = true;
+	}
+	else if (isState(SET_NODE_TYPE))
+	{
+		PRTLN("\n--> SET_NODE_TYPE");
+		setState(WAIT);
+		apiframe cmd = apiPacket(SMK_WRITE_REG, {0, 7, 1, 0}, LOCAL);
+		WriteAndExpectAnwser(gateway, cmd, SMK_WRITE_REG, "settype1", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void 
+		{
+			if(!success) { PRTLN("  Unable to set node as gateway"); return; }
+			PRTLN("\n--> SAVE TO EEPROM");
+			setState(WAIT);
+			apiframe cmd = apiPacket(SMK_TRANSFERT_MEM, {2}, LOCAL);
+			WriteAndExpectAnwser(gateway, cmd, SMK_TRANSFERT_MEM, "settype2", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void 
+			{
+				if(!success) { PRTLN("  Unable to save to EEPROM"); return; }
+				setState(RESET,READ_GW_FIRMWARE);
+				PRTLN("  SAVE to EEPROM sucess");
+				log[String(millis())] = "SAVE to EEPROM";
+				setOtaTimeout(300000);
+			}));
+			resetOtaTimeout();
+		}));
 	}
 	else if (isState(READ_GW_FIRMWARE))
 	{
