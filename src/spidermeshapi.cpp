@@ -427,14 +427,7 @@ void SpidermeshApi::OptimalDelay()
         {
             delay(100);
             remaining -=100;
-            if(smkport.available())
-            {
-                Serial.print(KRED);
-                Serial.print("  SMK900 received before delay expired. Remaining expected: ");
-                Serial.println(remaining);      
-                Serial.print(KNRM);
-                break;
-            }
+            if(smkport.available()) break;
         } while (remaining>0);
     }
     else
@@ -590,7 +583,8 @@ bool SpidermeshApi::sendNextPacketBuffered()
             MeshRequest_t req = writeAndExpectList.front();
             writeAndExpectList.pop_front();
             cmd = req.payload;
-            WriteAndExpectAnwser(req.pNode, req.payload, PACKET_VM_RESP, req.tag, req.callback);
+            byte pType = (req.payload[3]!=PACKET_TXAIR_CMD_WRAPPER) ? req.payload[3] : req.payload[5];
+            WriteAndExpectAnwser(req.pNode, req.payload, pType, req.tag, req.callback);
         }
 
         if(show_apipkt_out)
@@ -771,13 +765,14 @@ void SpidermeshApi::CheckIfAnswerWasExpectedAndCallSuccessFunction(apiframe rxPk
 
           #if SHOW_EXPECT_EVENT
             Serial.print("rxPkt: ");
-            printApiPacket(rxPkt);
+            printApiPacket(rxPkt, "  expect:", KCYN);
           #endif            
 
 
         // for all expected answer recorded
         while (i != listOfExpectedAnswer.end())
         {
+
             //if packet is local
             if(rxPkt[3] != PACKET_REMOTE_ANSWER)
             {
@@ -792,7 +787,7 @@ void SpidermeshApi::CheckIfAnswerWasExpectedAndCallSuccessFunction(apiframe rxPk
                         Serial.println(" = callback done");
                     #endif
     
-                        break;
+                    break;
                 }
             }
             //since it is remote check the remote packet type futher
@@ -818,17 +813,17 @@ void SpidermeshApi::CheckIfAnswerWasExpectedAndCallSuccessFunction(apiframe rxPk
                 if(add_rx.address== i->_pNode->second.mac.address)
                 {
 
-                    #if SHOW_EXPECT_EVENT
-                        Serial.println(" == expect match found");
-                    #endif
+                  #if SHOW_EXPECT_EVENT
+                    Serial.println(" == expect match found");
+                  #endif
 
-                    #if MODBUS_REGISTER_ENABLED
+                  #if MODBUS_REGISTER_ENABLED
                     Helper::PollPacketToModbusRegister(i->_pNode, rxPkt);
-                    #endif
+                  #endif
 
                     i->_expect_callback(i->_pNode, rxPkt, true, i->_tag);
 
-                     i->_pNode->second.dataValid = true;
+                    i->_pNode->second.dataValid = true;
                   #if SHOW_EXPECT_EVENT
                     Serial.println("  data validity TRUE  <----------" + i->_pNode->second.name);
                   #endif

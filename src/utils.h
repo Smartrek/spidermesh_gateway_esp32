@@ -33,7 +33,7 @@ typedef std::vector<byte> apiframe;
 apiframe convertAsciiTohexCommand(const char *asciiCommand);
 bool putPacketInsideBuffer(apiframe packet, uint8_t* buffer);
 void printApiPacket(uint8_t* buffer, int size);
-void printApiPacket(apiframe hcmd, String prefix = "");
+void printApiPacket(apiframe hcmd, String prefix = "", String color=KMAG);
 void setupWatchdog(hw_timer_t** pWatchdog, long millis, void (*fn)(void));
 void kickWatchdog(hw_timer_t* watchdog);
 std::vector<String> splitString(String in, char splitChar);

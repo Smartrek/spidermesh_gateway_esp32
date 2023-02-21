@@ -70,15 +70,15 @@ void printApiPacket(uint8_t* buffer, int size)
 }
 
 
-void printApiPacket(apiframe hcmd, String prefix)
+void printApiPacket(apiframe hcmd, String prefix, String color)
 {
     if(hcmd.size()>0)
     {
         String packet = hexPacketToAscii(hcmd);
-        Serial.printf("%s", KMAG);
+        Serial.print(color);
         Serial.print(prefix);
         Serial.println(packet);
-        Serial.printf("%s", KNRM);
+        Serial.print(KNRM);
     }
 }
 
