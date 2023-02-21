@@ -520,7 +520,7 @@ bool Spidermesh::ProcessState(bool eob)
 	}
 	else if(isState(WAIT))
 	{
-
+		delay(25);
 	}
 	else if (isState(RESET))
 	{
@@ -582,9 +582,12 @@ bool Spidermesh::ProcessState(bool eob)
 	else if (isState(INIT_GATEWAY_REGISTER))
 	{
 		#if SHOW_SMK900_INIT
+
+		PRT(KBLU);
 		Serial.println("--> INIT_GATEWAY_REGISTER");
+		PRT(KNRM);
 		#endif
-		setState(INIT_GATEWAY_REGISTER_WAIT_DONE);
+		setState(WAIT);
 		log[String(millis())] = "INIT smk900";
 
 		// set gateway mac as unavailable
@@ -658,7 +661,7 @@ bool Spidermesh::ProcessState(bool eob)
 						SpidermeshApi::findNext(true,true);
 						//auto g = gateway;
 						initDone = true;
-						setState(GET_SPEED_DYN);
+						setState(READ_GW_FIRMWARE);
 					}));
                 }));
             })); 
@@ -666,13 +669,63 @@ bool Spidermesh::ProcessState(bool eob)
 
 		ret = true;
 	}
-	else if (isState(INIT_GATEWAY_REGISTER_WAIT_DONE))
+	else if (isState(READ_GW_FIRMWARE))
 	{
-		if(initDone)
-		{ 
-			setState(GET_SPEED_DYN);		
-			ret=true;
-		}
+		PRTLN("\n--> READ_GW_FIRMWARE");
+		setOtaTimeout(20000);
+
+		// apiframe cmd = apiPacket({0x03, 0x01, 0x02, 0x06}); // ret reg 2 DYN
+		apiframe cmd = apiPacket(SMK_READ_REG, {0x00, 21, 1}, LOCAL);
+
+		setState(WAIT);
+		WriteAndExpectAnwser(gateway, cmd, SMK_READ_REG,  "getgwfirm", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
+																		{
+            //TIMEOUT
+            if(!success) { PRTLN("  Unable to get firmware"); return; }
+        
+            //SUCESS
+			pNode->second.new_firmware.version = packet[7];
+			apiframe cmd = apiPacket(SMK_READ_REG, {0x00, 24, 2}, LOCAL);
+			WriteAndExpectAnwser(gateway, cmd, SMK_READ_REG,  "getgwsubfirm", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
+																			{
+				//TIMEOUT
+				if(!success) { PRTLN("  Unable to get subfirmware"); return; }
+			
+				//SUCESS
+				pNode->second.new_firmware.sub_version = packet[7] + (packet[8]<<8);
+
+				apiframe cmd = apiPacket(SMK_READ_REG, {0x00, 25, 2}, LOCAL);
+				WriteAndExpectAnwser(gateway, cmd, SMK_READ_REG,  "getgwdb", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
+																				{
+					//TIMEOUT
+					if(!success) { PRTLN("  Unable to get database"); return; }
+				
+					//SUCESS
+					pNode->second.new_firmware.database = packet[7] + (packet[8]<<8);
+
+					apiframe cmd = apiPacket(SMK_READ_REG, {0x00, 26, 1}, LOCAL);
+					WriteAndExpectAnwser(gateway, cmd, SMK_READ_REG,  "getgwser", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
+																					{
+						//TIMEOUT
+						if(!success) { PRTLN("  Unable to get serial pn"); return; }
+					
+						//SUCESS
+						pNode->second.new_firmware.serie = packet[7];
+						PRT(KBLU);
+						PRT("  FIRMWARE: ");
+						PRT(pNode->second.new_firmware.version);
+						PRT(".");
+						PRT(pNode->second.new_firmware.sub_version);
+						PRT(".");
+						PRT(pNode->second.new_firmware.database);
+						PRT(".");
+						PRTLN(pNode->second.new_firmware.serie);
+						PRT(KNRM);
+						setState(GET_SPEED_DYN);
+					}));
+				}));
+			}));
+		}));
 	}
 	else if (isState(GET_SPEED_DYN))
 	{
@@ -795,38 +848,42 @@ bool Spidermesh::ProcessState(bool eob)
 			}
 			else
 			{
-				//__________________________________________
-				PRTLN("\n--> SET_SPEED_RF");
-				//apiframe cmd = apiPacket({0x04, 0, 11, 1,expectedPresetRF}); 
-				
-				setState(WAIT);
-				apiframe cmd = apiPacket(SMK_WRITE_REG, {0, 11, 1, expectedPresetRF}, LOCAL);
-				WriteAndExpectAnwser(gateway, cmd, 0x14, "getpreset", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void 
-				{
-					//TIMEOUT
-					if(!success) { PRTLN("  Unable to get speed rf"); return; }
-
-					log[String(millis())] = "SET_SPEED_RF";
-					//__________________________________________
-					PRTLN("\n--> SAVE TO EEPROM");
-					//apiframe cmd = apiPacket({0x0B, 2});
-					setState(WAIT);
-					apiframe cmd = apiPacket(SMK_TRANSFERT_MEM, {2}, LOCAL);
-					WriteAndExpectAnwser(gateway, cmd, 0x1B, "getpreset", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void 
-					{
-						//TIMEOUT
-						if(!success) { PRTLN("  Unable to save to EEPROM"); return; }
-
-						setState(RESET,TEST_SERIAL_COMM);
-						PRTLN("  SAVE to EEPROM sucess");
-						log[String(millis())] = "SAVE to EEPROM";
-						setOtaTimeout(300000);
-					}));
-					resetOtaTimeout();
-				}));
+				setState(SET_SPEED_RF);
 			} 
 		}));
 		ret = true;
+	}
+	else if (isState(SET_SPEED_RF))
+	{
+		//__________________________________________
+		PRTLN("\n--> SET_SPEED_RF");
+		//apiframe cmd = apiPacket({0x04, 0, 11, 1,expectedPresetRF}); 
+		
+		setState(WAIT);
+		apiframe cmd = apiPacket(SMK_WRITE_REG, {0, 11, 1, requiredMeshSpeed.rf_speed}, LOCAL);
+		WriteAndExpectAnwser(gateway, cmd, 0x14, "getpreset", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void 
+		{
+			//TIMEOUT
+			if(!success) { PRTLN("  Unable to get speed rf"); return; }
+
+			log[String(millis())] = "SET_SPEED_RF";
+			//__________________________________________
+			PRTLN("\n--> SAVE TO EEPROM");
+			//apiframe cmd = apiPacket({0x0B, 2});
+			setState(WAIT);
+			apiframe cmd = apiPacket(SMK_TRANSFERT_MEM, {2}, LOCAL);
+			WriteAndExpectAnwser(gateway, cmd, 0x1B, "getpreset", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void 
+			{
+				//TIMEOUT
+				if(!success) { PRTLN("  Unable to save to EEPROM"); return; }
+
+				setState(RESET,TEST_SERIAL_COMM);
+				PRTLN("  SAVE to EEPROM sucess");
+				log[String(millis())] = "SAVE to EEPROM";
+				setOtaTimeout(300000);
+			}));
+			resetOtaTimeout();
+		}));
 	}
 	else if (isState(TEST_SERIAL_COMM))
 	{

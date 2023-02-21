@@ -80,7 +80,7 @@ enum ota_state
 
 	/* Depending of the mode, it can go elswhere at the end of this sequence  */
 	INIT_GATEWAY_REGISTER,	  /* 1 EOB                   0  */
-	INIT_GATEWAY_REGISTER_WAIT_DONE,
+	READ_GW_FIRMWARE,
 	WAIT_CONFIG,
 	GET_SPEED_DYN,	  /* 1 EOB                   0  */
 	SET_SPEED_DUTY,	  /* 1 EOB                   0  */
