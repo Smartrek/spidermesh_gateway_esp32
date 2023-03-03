@@ -81,6 +81,11 @@ typedef std::list<apiframe> listPacket_t;
 #define SMK_UPDATE_OTA_CMD		0x06
 
 
+
+#define MEM_RAMBUFF     0
+#define MEM_RAM         1
+#define MEM_EEPROM      2
+
 #define PREFIX_OUT	"  out: "
 #define PREFIX_IN 	"  in : "
 
