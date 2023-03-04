@@ -2,7 +2,8 @@
 
 DynamicJsonDocument SmkList::type_json(SIZE_OF_DYNAMIC_JSON_FILE);
 mesh_t SmkList::pool;
-DynamicJsonDocument SmkNode::config(1000);
+
+DefineParametersCb SmkList::cbDefineParameters;
 
 
 //------------------------------------------------------------------------------------------------------------
@@ -33,6 +34,8 @@ bool SmkList::loadNodes(String nodes)
     }
 
 
+    Serial.print(KYEL);
+    Serial.println("-------CONFIG------");
     for (JsonPair kv : nodes_json.as<JsonObject>()) 
     {
         SmkNode x;//create new node
@@ -68,15 +71,16 @@ bool SmkList::loadNodes(String nodes)
 
         x.otaStep = STEP_INIT;
 
+        if(j.containsKey("config"))
+        {
+            cbDefineParameters(j["config"].as<JsonObject>(),x.parameters);
+            //config.set(j["config"].as<JsonObject>());
+        }
 
         //addition of the node into the pool list
         auto it = pool.insert(std::make_pair(x.mac.address,x));
 
-        if(j.containsKey("config"))
-        {
-            it.first->second.config.set(j["config"].as<JsonObject>());
-        }
-        it.first->second.config.shrinkToFit();
+
         
         #if SHOW_LOAD_NODE_DEBUG
           Serial.print("  new node:");
@@ -94,17 +98,6 @@ bool SmkList::loadNodes(String nodes)
   #if SHOW_LOAD_NODE_DEBUG || SHOW_MIN_DEBUG
     Serial.println("Node list file loaded successfully.");
   #endif
-
-
-  for(auto y:pool)
-  {
-      String pretty = "";
-      serializeJsonPretty(y.second.config, pretty);
-      Serial.println(pretty);
-  }
-
-
-
 
   return true;
 }
@@ -118,7 +111,8 @@ bool SmkList::loadNodes(JsonVariant nodes_json)
     Serial.printf("--------------------------------\r\n");
   #endif
 
-
+   Serial.print(KYEL);
+    Serial.println("-------CONFIG------");
     for (JsonPair kv : nodes_json.as<JsonObject>()) 
     {
         SmkNode x;//create new node
@@ -155,7 +149,15 @@ bool SmkList::loadNodes(JsonVariant nodes_json)
         x.otaStep = STEP_INIT;
 
         //addition of the node into the pool list
-        pool.insert(std::make_pair(x.mac.address,x));
+        auto it = pool.insert(std::make_pair(x.mac.address,x));
+
+
+        if(j.containsKey("config"))
+        {
+            cbDefineParameters(j["config"].as<JsonObject>(),x.parameters);
+            //config.set(j["config"].as<JsonObject>());
+        }
+
         #if SHOW_LOAD_NODE_DEBUG
           Serial.print("  new node:");
           Serial.print(kv.key().c_str());
@@ -173,6 +175,17 @@ bool SmkList::loadNodes(JsonVariant nodes_json)
     Serial.println("Node list file loaded successfully.");
   #endif
 
+
+  Serial.print(KRED);
+  Serial.println("-------CONFIG------");
+
+
+
+
+  for(auto y:pool)
+  {
+  }
+  Serial.print(KNRM);
 
 
 

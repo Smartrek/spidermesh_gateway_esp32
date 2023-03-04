@@ -106,6 +106,10 @@ enum step_t
 	STEP_COMPLETED
 };
 
+class Parameter;
+
+typedef std::function<void(JsonObject jsonp, Parameter* p)> DefineParametersCb;
+
 class SmkNode
 {
 public:
@@ -140,7 +144,10 @@ public:
 
 	// DynamicJsonDocument type_json;
 	JsonVariant pjson_type;
-	static DynamicJsonDocument config;
+	Parameter* parameters;
+
+
+
 };
 
 typedef std::map<uint32_t, SmkNode> mesh_t;
@@ -176,6 +183,7 @@ private:
 	//static DynamicJsonDocument type_json;
 public:
 	static DynamicJsonDocument type_json;
+	static DynamicJsonDocument config;
 	// std::map<String, NodeType_t> nType;
 	static JsonVariant getTypeJsonVariant();
 
@@ -190,6 +198,8 @@ public:
 
 public:
 	SmkList();
+
+	static DefineParametersCb cbDefineParameters;
 	bool insertNewNodeInList(std::vector<SmkNode> *node_list, String node_line);
 
 	bool loadParamFiles();
