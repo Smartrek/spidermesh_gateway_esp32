@@ -1,26 +1,32 @@
 {
     "0.0.0.1": {
         "name": "Location 1",
-        "type": "vacuum"
+        "type": "vacuum",
+        "config":{"offset":0}
     },
     "0.0.0.2": {
         "name": "Location 2",
-        "type": "vacuum"
+        "type": "vacuum",
+        "config":{"offset":10}
     },
     "0.0.0.3": {
         "name": "Location 3",
-        "type": "vacuum"
+        "type": "vacuum",
+        "config":{"offset":20}
     },
     "0.0.1.1": {
         "name": "Repeater 1",
-        "type": "repeater"
+        "type": "repeater",
+        "config":{"offset":30}
     },           
     "0.0.1.2": {
         "name": "Repeater 2",
-        "type": "repeater"
+        "type": "repeater",
+        "config":{"offset":40}
     },           
     "0.0.1.3": {
         "name": "Repeater 3",
-        "type": "repeater"
+        "type": "repeater",
+        "config":{"offset":50}
     }        
 }

@@ -140,6 +140,7 @@ public:
 
 	// DynamicJsonDocument type_json;
 	JsonVariant pjson_type;
+	static DynamicJsonDocument config;
 };
 
 typedef std::map<uint32_t, SmkNode> mesh_t;

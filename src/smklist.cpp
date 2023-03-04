@@ -2,6 +2,8 @@
 
 DynamicJsonDocument SmkList::type_json(SIZE_OF_DYNAMIC_JSON_FILE);
 mesh_t SmkList::pool;
+DynamicJsonDocument SmkNode::config(1000);
+
 
 //------------------------------------------------------------------------------------------------------------
 SmkList::SmkList()
@@ -66,8 +68,16 @@ bool SmkList::loadNodes(String nodes)
 
         x.otaStep = STEP_INIT;
 
+
         //addition of the node into the pool list
-        pool.insert(std::make_pair(x.mac.address,x));
+        auto it = pool.insert(std::make_pair(x.mac.address,x));
+
+        if(j.containsKey("config"))
+        {
+            it.first->second.config.set(j["config"].as<JsonObject>());
+        }
+        it.first->second.config.shrinkToFit();
+        
         #if SHOW_LOAD_NODE_DEBUG
           Serial.print("  new node:");
           Serial.print(kv.key().c_str());
@@ -84,6 +94,14 @@ bool SmkList::loadNodes(String nodes)
   #if SHOW_LOAD_NODE_DEBUG || SHOW_MIN_DEBUG
     Serial.println("Node list file loaded successfully.");
   #endif
+
+
+  for(auto y:pool)
+  {
+      String pretty = "";
+      serializeJsonPretty(y.second.config, pretty);
+      Serial.println(pretty);
+  }
 
 
 
