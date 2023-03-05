@@ -4,7 +4,7 @@
     "status":{
       "params":{
         "rssi":{"pos":[0,8]},
-        "volt":{"pos":[8,8]}
+        "volt":{"pos":[8,8],"gain":20, "fix":2, "u":"V"}
       }
     }
   }

@@ -10,8 +10,77 @@ DefineParametersCb SmkList::cbDefineParameters;
 SmkList::SmkList()
 {
     conversion_type.insert(std::pair<String,int>("int", 0));
-    conversion_type.insert(std::pair<String,int>("float", 3));   
+    conversion_type.insert(std::pair<String,int>("float", 3));  
 }
+
+mesh_t::iterator SmkList::addNode(JsonPair node)
+{
+    mesh_t::iterator ret = pool.end();
+    SmkNode x;//create new node
+    JsonObject j = node.value().as<JsonObject>();
+
+    int m =  macString2Umac(node.key().c_str());
+    auto f = pool.find(m);
+    
+    if (f != pool.end())
+    {
+        ret = f;
+    }
+
+    else
+    {
+
+        //mac address
+        x.mac.address = macString2Umac(node.key().c_str());
+
+        //String node_name = kv.key().c_str();
+        x.name = j["name"].as<String>();
+
+        //load of group
+        if(j.containsKey("group")) x.group = j["group"].as<String>();
+        else if(j.containsKey("trail")) x.group = j["trail"].as<String>(); //for legacy snofi
+        else x.group = "";
+        
+        x.type = j["type"].as<String>();
+        x.enabled = (j.containsKey("enabled")) ? j["enabled"].as<bool>(): true;
+        x.local =(j.containsKey("local"))?j["local"].as<bool>():false;
+        x.sample_rate = (j.containsKey("srate"))?j["srate"].as<int>():0;
+        
+
+        //Internal variable of node
+        x.nb_retry_count=0;
+        x.dataValid=false;
+        #if MODBUS_REGISTER_ENABLED
+        x.startAddresseModbusRegister = j["start_address"].as<int>();
+        #endif
+
+        x.elapse_time = 0;
+        #if MODBUS_REGISTER_ENABLED
+        x.valid_node_index_for_read_coil_bit = index_order_entry++;
+        #endif
+
+        x.otaStep = STEP_INIT;
+
+        //addition of the node into the pool list
+        auto it = pool.insert(std::make_pair(x.mac.address,x));
+
+
+        if(j.containsKey("config")  &&  cbDefineParameters != NULL ) 
+            cbDefineParameters(j["config"].as<JsonObject>(),&pool[x.mac.address].parameters);
+
+        #if SHOW_LOAD_NODE_DEBUG
+          Serial.print("  new node:");
+          Serial.print(node.key().c_str());
+          Serial.print("  name:");
+          Serial.print(x.name);
+          Serial.print("  type:");
+          Serial.println(x.type);
+        #endif
+    }
+
+    return ret;
+}
+
 
 //------------------------------------------------------------------------------------------------------------
 bool SmkList::loadNodes(String nodes)
@@ -32,74 +101,7 @@ bool SmkList::loadNodes(String nodes)
       #endif
         return false;
     }
-
-
-    Serial.print(KYEL);
-    Serial.println("-------CONFIG------");
-    for (JsonPair kv : nodes_json.as<JsonObject>()) 
-    {
-        SmkNode x;//create new node
-        JsonObject j = kv.value().as<JsonObject>();
-
-        //String node_name = kv.key().c_str();
-        x.name = j["name"].as<String>();
-
-        //load of group
-        if(j.containsKey("group")) x.group = j["group"].as<String>();
-        else if(j.containsKey("trail")) x.group = j["trail"].as<String>(); //for legacy snofi
-        else x.group = "";
-        
-        //mac address
-        x.mac.address = macString2Umac(kv.key().c_str());
-        x.type = j["type"].as<String>();
-        x.enabled = (j.containsKey("enabled")) ? j["enabled"].as<bool>(): true;
-        x.local =(j.containsKey("local"))?j["local"].as<bool>():false;
-        x.sample_rate = (j.containsKey("srate"))?j["srate"].as<int>():0;
-        
-
-        //Internal variable of node
-        x.nb_retry_count=0;
-        x.dataValid=false;
-        #if MODBUS_REGISTER_ENABLED
-        x.startAddresseModbusRegister = j["start_address"].as<int>();
-        #endif
-
-        x.elapse_time = 0;
-        #if MODBUS_REGISTER_ENABLED
-        x.valid_node_index_for_read_coil_bit = index_order_entry++;
-        #endif
-
-        x.otaStep = STEP_INIT;
-
-        if(j.containsKey("config"))
-        {
-            cbDefineParameters(j["config"].as<JsonObject>(),x.parameters);
-            //config.set(j["config"].as<JsonObject>());
-        }
-
-        //addition of the node into the pool list
-        auto it = pool.insert(std::make_pair(x.mac.address,x));
-
-
-        
-        #if SHOW_LOAD_NODE_DEBUG
-          Serial.print("  new node:");
-          Serial.print(kv.key().c_str());
-          Serial.print("  name:");
-          Serial.print(x.name);
-          Serial.print("  type:");
-          Serial.println(x.type);
-        #endif
-    }
-  #if SHOW_LOAD_NODE_DEBUG
-    Serial.printf("--------------------------------\r\n");
-  #endif
-
-  #if SHOW_LOAD_NODE_DEBUG || SHOW_MIN_DEBUG
-    Serial.println("Node list file loaded successfully.");
-  #endif
-
-  return true;
+    return loadNodes(nodes_json.as<JsonVariant>());
 }
 
 //------------------------------------------------------------------------------------------------------------
@@ -115,57 +117,7 @@ bool SmkList::loadNodes(JsonVariant nodes_json)
     Serial.println("-------CONFIG------");
     for (JsonPair kv : nodes_json.as<JsonObject>()) 
     {
-        SmkNode x;//create new node
-        JsonObject j = kv.value().as<JsonObject>();
-
-        //String node_name = kv.key().c_str();
-        x.name = j["name"].as<String>();
-
-        //load of group
-        if(j.containsKey("group")) x.group = j["group"].as<String>();
-        else if(j.containsKey("trail")) x.group = j["trail"].as<String>(); //for legacy snofi
-        else x.group = "";
-        
-        //mac address
-        x.mac.address = macString2Umac(kv.key().c_str());
-        x.type = j["type"].as<String>();
-        x.enabled = (j.containsKey("enabled")) ? j["enabled"].as<bool>(): true;
-        x.local =(j.containsKey("local"))?j["local"].as<bool>():false;
-        x.sample_rate = (j.containsKey("srate"))?j["srate"].as<int>():0;
-        
-
-        //Internal variable of node
-        x.nb_retry_count=0;
-        x.dataValid=false;
-        #if MODBUS_REGISTER_ENABLED
-        x.startAddresseModbusRegister = j["start_address"].as<int>();
-        #endif
-
-        x.elapse_time = 0;
-        #if MODBUS_REGISTER_ENABLED
-        x.valid_node_index_for_read_coil_bit = index_order_entry++;
-        #endif
-
-        x.otaStep = STEP_INIT;
-
-        //addition of the node into the pool list
-        auto it = pool.insert(std::make_pair(x.mac.address,x));
-
-
-        if(j.containsKey("config"))
-        {
-            cbDefineParameters(j["config"].as<JsonObject>(),x.parameters);
-            //config.set(j["config"].as<JsonObject>());
-        }
-
-        #if SHOW_LOAD_NODE_DEBUG
-          Serial.print("  new node:");
-          Serial.print(kv.key().c_str());
-          Serial.print("  name:");
-          Serial.print(x.name);
-          Serial.print("  type:");
-          Serial.println(x.type);
-        #endif
+        addNode(kv);
     }
   #if SHOW_LOAD_NODE_DEBUG
     Serial.printf("--------------------------------\r\n");
@@ -174,21 +126,6 @@ bool SmkList::loadNodes(JsonVariant nodes_json)
   #if SHOW_LOAD_NODE_DEBUG || SHOW_MIN_DEBUG
     Serial.println("Node list file loaded successfully.");
   #endif
-
-
-  Serial.print(KRED);
-  Serial.println("-------CONFIG------");
-
-
-
-
-  for(auto y:pool)
-  {
-  }
-  Serial.print(KNRM);
-
-
-
   return true;
 }
 
@@ -362,51 +299,6 @@ void SmkList::assignTypeToNode()
         else
           Serial.println("Type to assign does't exist");
     }  
-}
-
-//------------------------------------------------------------------------------------------------------------
-bool SmkList::add(uint32_t mac, String type, bool local, String group, String name, bool enabled, uint16_t sample_rate) 
-{
-
-    #if MODBUS_REGISTER_ENABLED
-    if(start_mod_add ==-1) return false;
-    #endif
-
-  #if 1 //SHOW_LOAD_NODE_DEBUG
-    String node="mac:" + macInt2String(mac) + "  group:" + group + "  name:" + name + "  type:" + type + "  sample_rate:" + String(sample_rate);
-    Serial.println("to add= " + node);
-  #endif
-  
-    SmkNode x;
-
-    //mac address
-    uint32_t mac_32bit = mac;
-    x.mac.address = mac_32bit;
-    x.group = group;
-    x.name = name;
-    x.type = type;
-    x.sample_rate = sample_rate;
-    x.local=local;
-  #if MODBUS_REGISTER_ENABLED
-    x.startAddresseModbusRegister = start_mod_add;
-  #endif  
-
-    //if the node exist update it
-    Serial.printf("Node ");
-    Serial.print(x.getMacAsString());
-    if ( find(mac_32bit) != pool.end() )
-    {
-        Serial.println(" have been updated");
-
-        pool[mac_32bit]=x;
-    }
-    //otherwise add it
-    else
-    {
-        Serial.println(" have been added to the list");
-        pool.insert(std::pair<uint32_t, SmkNode>(mac_32bit, x));
-    }
-    return true;
 }
 
 //------------------------------------------------------------------------------------------------------------

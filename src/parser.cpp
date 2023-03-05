@@ -1,7 +1,7 @@
 #include <parser.h>
 
 
-bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payload, String &type)
+bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payload, String &type, bool includeUnits)
 {
 	if(packet.size()<=10) return false;
 
@@ -10,7 +10,7 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 	Serial.print ("  --> tag: ");
 	Serial.println (tag);
 
-	if(!type_json.containsKey(type)) Serial.printf("Node type:%s not available\n", type);
+	if(!SmkList::type_json.containsKey(type)) Serial.printf("Node type:%s not available\n", type);
   #endif
 
 
@@ -37,7 +37,7 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 
 	for(auto x:extract_parameters)
 	{
-		float fResult=0; //if needed
+		double fResult=0; //if needed
 		bool float_result = false;
 
 		JsonObject def_params = x.value().as<JsonObject>();
@@ -53,22 +53,8 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 		Serial.print(x.key().c_str());
 	  #endif
 
-
-		String stype = def_params["type"].as<String>();
-		if(stype == "hex2str")
-		{
-			String result = "";
-			for(int i=0; i<len/8;i++)
-			{
-				char h2s[6];
-				sprintf(h2s, "%02X", packet[i+10+begin/8]);
-				result +=h2s;
-			}
-
-			payload[x.key()] = result;
-			continue;
-		}
-
+		String stype = "int"; //default
+		if(def_params.containsKey("type")) stype = def_params["type"].as<String>();
 
 		//get variable byte from the packet according to the definition of the variable position
 		for(int i=0; i<(len/8)+2 && ((idx_begin_data_byte+i) < packet.size()); i++)
@@ -90,16 +76,52 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 		Serial.println();
 	  #endif
 
-		uint32_t scaled_raw_data = getbits(unscaled_raw_data,begin%8,len);
+		long scaled_raw_data = getbits(unscaled_raw_data,begin%8,len);
 	  #if SHOW_DEBUG_EXTRACT_DATA
 		Serial.printf("  scaled: %lu, s: %d, len: %d", scaled_raw_data, begin%8, len);
 		Serial.print(" = ");
 		Serial.println(scaled_raw_data);
 	  #endif
 
+		//if number is 16bits signed and is negative, convert in negative int 32bit
+		if(stype=="short" && scaled_raw_data &0x8000) scaled_raw_data |= 0xFFFFFFFFFFFF0000;
+		else if(stype=="int" && scaled_raw_data &0x80000000) scaled_raw_data |= 0xFFFFFFFF00000000;
+		else if(stype == "hex2str")
+		{
+			String result = "";
+			for(int i=0; i<len/8;i++)
+			{
+				char h2s[6];
+				sprintf(h2s, "%02X", packet[i+10+begin/8]);
+				result +=h2s;
+			}
+			payload[x.key()] = result;
+			continue;
+		}
+
+
+		if(stype == "float")
+		{
+			fResult = *((float*) &scaled_raw_data);
+			float_result = true;
+		}
+		else
+		{
+			fResult = scaled_raw_data;
+			float_result = true;
+		}
+		
+
+
+
+
+
+
+
+
 		if(def_params.containsKey("gain"))
 		{
-			float g = def_params["gain"].as<float>();
+			double g = def_params["gain"].as<double>();
 			fResult = scaled_raw_data;
 			fResult *= g;
 		  #if SHOW_DEBUG_EXTRACT_DATA
@@ -108,9 +130,10 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 		  #endif
 		  	float_result = true;
 		}
+
 		if(def_params.containsKey("div"))
 		{
-			float d = def_params["div"].as<float>();
+			double d = def_params["div"].as<double>();
 			fResult = scaled_raw_data;
 			fResult /= d;
 		  #if SHOW_DEBUG_EXTRACT_DATA
@@ -122,18 +145,9 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 
 		if(def_params.containsKey("offset"))
 		{
-			float fOff = def_params["offset"].as<float>();
+			double fOff = def_params["offset"].as<double>();
 			if(float_result) fResult += fOff;
-			else fResult = (float)scaled_raw_data + fOff;			
-		}
-		if(stype == "float")
-		{
-			fResult = *((float*) &scaled_raw_data);
-			float_result = true;
-		  #if SHOW_DEBUG_EXTRACT_DATA
-			Serial.print(" d= ");
-			Serial.print(fResult);
-		  #endif
+			else fResult = (double)scaled_raw_data + fOff;			
 		}
 		
 		if(def_params.containsKey("dict"))
@@ -150,20 +164,51 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 		//put inside json payload
 		if(float_result)
 		{
-		  #if SHOW_DEBUG_EXTRACT_DATA
-			Serial.print(" = ");
-			Serial.println(fResult);
-		  #endif
-			payload[x.key()] = fResult;
+		  	if(def_params.containsKey("fix"))
+			{
+				int fix = def_params["fix"].as<int>();
+				int fix_apply = 1;
+				for(int i=0;i<fix;i++) fix_apply *= 10;
+				fResult /= fix_apply;
+			}
+
+			if(includeUnits && def_params.containsKey("u"))
+			{
+				JsonObject key = payload.createNestedObject(x.key());
+				key["value"]=fResult;
+				key["units"]=def_params["u"];
+
+			}
+			else payload[x.key()] = fResult;
 		}
+		/*
 		else
 		{
 		  #if SHOW_DEBUG_EXTRACT_DATA
 			Serial.print(" = ");
 			Serial.println(scaled_raw_data);
 		  #endif
-			payload[x.key()] = scaled_raw_data;
+
+			bool f = false;
+		  	if(def_params.containsKey("fix"))
+			{
+				int fix = def_params["fix"].as<int>();
+				fResult /= (fix*10);
+				f=true;
+			}
+
+			if(includeUnits && def_params.containsKey("u"))
+			{
+				JsonObject key = payload.createNestedObject(x.key());
+				key["value"]=fResult;
+				key["units"]=def_params["u"];
+				f= true;
+			}		  
+
+			if(f) payload[x.key()] = fResult;
+			else payload[x.key()] = scaled_raw_data;
 		}
+		*/
 	}
 	
 	return true;

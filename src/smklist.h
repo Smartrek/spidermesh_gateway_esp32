@@ -9,6 +9,7 @@
 #include <utils.h>
 #include "HardwareProfile.h"
 #include <map>
+#include <Parameters.h>
 
 enum
 {
@@ -106,7 +107,6 @@ enum step_t
 	STEP_COMPLETED
 };
 
-class Parameter;
 
 typedef std::function<void(JsonObject jsonp, Parameter* p)> DefineParametersCb;
 
@@ -144,7 +144,7 @@ public:
 
 	// DynamicJsonDocument type_json;
 	JsonVariant pjson_type;
-	Parameter* parameters;
+	Parameter parameters;
 
 
 
@@ -183,7 +183,6 @@ private:
 	//static DynamicJsonDocument type_json;
 public:
 	static DynamicJsonDocument type_json;
-	static DynamicJsonDocument config;
 	// std::map<String, NodeType_t> nType;
 	static JsonVariant getTypeJsonVariant();
 
@@ -230,11 +229,7 @@ private:
 public:
 	void addParamToUpdate(String node_name, String name, String value) { listParam.push_back(ParamList_t(node_name, name, value)); };
 
-#if MODBUS_REGISTER_ENABLED
-	bool add(uint32_t mac, String type, String group = "", String name = "", int start_mod_add = -1, int sample_rate = 0);
-#else
-	bool add(uint32_t mac, String type, bool local, String group = "no_group", String name = "no_name", bool enabled = true, uint16_t sample_rate = 0);
-#endif
+	static mesh_t::iterator addNode(JsonPair node);
 	String isMacExist(String mac);
 	String isMacExist(uint32_t umac);
 

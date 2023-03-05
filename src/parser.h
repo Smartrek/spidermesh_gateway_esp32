@@ -11,7 +11,7 @@
 class SmkParser
 {
   public:
-	static bool rfPayloadToJson(apiframe &packet, String tag, JsonVariant payload, String &type);
+	static bool rfPayloadToJson(apiframe &packet, String tag, JsonVariant payload, String &type, bool includeUnits=false);
 
 
 	static uint64_t getbits(uint64_t value, uint64_t offset, unsigned n);

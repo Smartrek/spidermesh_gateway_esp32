@@ -645,9 +645,17 @@ bool Spidermesh::ProcessState(bool eob)
 
 						if(!initDoneOnce)
 						{
-							nodes.pool.clear(); 
-							nodes.add(a, "gateway", LOCAL, "main", "main gateway");
-							gateway=nodes.pool.begin();
+							//Creation of the gateway node
+							DynamicJsonDocument gateway_json(200);
+							gateway_json.createNestedObject(smac);
+							gateway_json[smac]["name"]="main";
+							gateway_json[smac]["type"]="gateway";
+							gateway_json[smac]["local"]=true;
+							gateway_json[smac]["srate"]=-1;
+							//for loop as a work around to get a JsonPair
+							for(auto jp:gateway_json.as<JsonObject>()) gateway = nodes.addNode(jp);
+
+							
 							if(cbLoadExternalParamFiles){
 								cbLoadExternalParamFiles();
 								dumpReceivedBuffer();
@@ -657,6 +665,7 @@ bool Spidermesh::ProcessState(bool eob)
 							} 
 							PRT("GATEWAY mac is: ");
 							PRTLN(smac);
+
 						}
 						SpidermeshApi::findNext(true,true);
 						//auto g = gateway;
