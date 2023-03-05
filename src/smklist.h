@@ -124,6 +124,7 @@ public:
 	bool local;
 	uint16_t sample_rate;
 	uint16_t elapse_time;
+	int8_t priority;
 	bool otaActive;
 	step_t otaStep;
 	String labelState;

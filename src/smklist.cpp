@@ -44,6 +44,7 @@ mesh_t::iterator SmkList::addNode(JsonPair node)
         x.enabled = (j.containsKey("enabled")) ? j["enabled"].as<bool>(): true;
         x.local =(j.containsKey("local"))?j["local"].as<bool>():false;
         x.sample_rate = (j.containsKey("srate"))?j["srate"].as<int>():0;
+        x.priority = (j.containsKey("priority")) ? j["priority"].as<int>() : 0;
         
 
         //Internal variable of node
