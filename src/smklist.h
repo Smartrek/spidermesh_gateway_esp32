@@ -143,7 +143,7 @@ public:
 	uint16_t nb_retry_count; // watchdog
 
 	// DynamicJsonDocument type_json;
-	JsonVariant pjson_type;
+	JsonObject pjson_type;
 	Parameter parameters;
 
 
