@@ -7,7 +7,9 @@
 #include <ArduinoJson.h>
 #include <utils.h>
 
-
+#ifndef DEFAULT_UNIT_TYPE
+	#define DEFAULT_UNIT_TYPE "int16"
+#endif
 class SmkParser
 {
   public:

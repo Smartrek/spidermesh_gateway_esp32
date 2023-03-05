@@ -9,8 +9,7 @@ DefineParametersCb SmkList::cbDefineParameters;
 //------------------------------------------------------------------------------------------------------------
 SmkList::SmkList()
 {
-    conversion_type.insert(std::pair<String,int>("int", 0));
-    conversion_type.insert(std::pair<String,int>("float", 3));  
+
 }
 
 mesh_t::iterator SmkList::addNode(JsonPair node)

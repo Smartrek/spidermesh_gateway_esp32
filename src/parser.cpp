@@ -120,12 +120,12 @@ double SmkParser::applyParams(int64_t value, JsonObject def_params)
 {
 	double fResult = value;
 
-	String stype = "int"; //default
+	String stype = DEFAULT_UNIT_TYPE; //default
 	if(def_params.containsKey("type")) stype = def_params["type"].as<String>();
 
 	//if number is 16bits signed and is negative, convert in negative int 32bit
-	if(stype=="short" && value &0x8000) value |= 0xFFFFFFFFFFFF0000;
-	else if(stype=="int" && value &0x80000000) value |= 0xFFFFFFFF00000000;
+	if(stype=="int16" && value &0x8000) value |= 0xFFFFFFFFFFFF0000;
+	else if(stype=="int32" && value &0x80000000) value |= 0xFFFFFFFF00000000;
 
 
 	if(stype == "float") 	fResult = *((float*) &value);

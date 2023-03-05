@@ -4,8 +4,8 @@
     "status":{
       "params":{
         "rssi":{"pos":[0,8]},
-        "vacuum":{"pos":[8,16], "type":"short"},
-        "temperature":{"pos":[24,16], "fix":2, "u":"C", "type":"short"},
+        "vacuum":{"pos":[8,16],"fix":1, "u":"inHg"},
+        "temperature":{"pos":[24,16], "fix":2, "u":"C"},
         "volt":{"pos":[40,8],"gain":20, "fix":2, "u":"V"}
       }
     }

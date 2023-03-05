@@ -192,7 +192,7 @@ public:
 	int _count;
 	String _fValues;
 	std::vector<String> trailList;
-	std::map<String, int> conversion_type;
+
 	uint16_t retry_counter;
 
 public:
