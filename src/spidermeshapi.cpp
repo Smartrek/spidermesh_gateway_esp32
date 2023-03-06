@@ -20,6 +20,7 @@ ExpectCallback SpidermeshApi::cb_automatic_polling_failed;
 RequestBuilderCallback SpidermeshApi::cbAutoRequestBuilder;
 unsigned char SpidermeshApi::state_serial;
 mesh_t::iterator SpidermeshApi::pCurrentNode;
+
 bool SpidermeshApi::_auto_polling_mode;
 String SpidermeshApi::polling_mode;
 
@@ -897,17 +898,22 @@ void SpidermeshApi::CheckExpectTimeout()
 void SpidermeshApi::automaticNodePolling()
 {
     static bool current_focus_cycle = true;
+    static bool toggle_polling=false;
+    static NodeIterator_t pNodeToPoll = nodes.pool.begin();
+
+    bool noToPollFound=false;
+    toggle_polling = !toggle_polling;    
+
   #if SHOW_AUTOMATIC_POLLING
     Serial.print("automaticNodePolling() mode:");
     Serial.println(polling_mode);
   #endif
-
+    mesh_t::iterator pPoll = nodes.pool.end();
     //if there are nodes to poll
     if(nodes.pool.size() > 1) //we check if more than one since gateway is the first
     {
         apiframe smkPacket;
         //bool must_increase_polling_iterator = false;
-        mesh_t::iterator pPoll = nodes.pool.end();
 
         unsigned long seconds = millis()/1000;
 
@@ -952,10 +958,68 @@ void SpidermeshApi::automaticNodePolling()
         }
         else if(polling_mode == "time")
         {
+
+
+
+
+
+
+            fastWhenNoNormal:
+            //FAST POLLONG
+            if(toggle_polling && (nodes.toPollFaster.size()>0))
+            {
+                int limitSecurity=nodes.toPollFaster.size();
+                do{
+                    ++nodes.idxNodeToPollFast;
+                    if(nodes.idxNodeToPollFast >= nodes.toPollFaster.size()) nodes.idxNodeToPollFast=0; //round robin fast polling
+                    pCurrentNode=nodes.toPollFaster[nodes.idxNodeToPollFast];
+                    pPoll = pCurrentNode;
+                    
+                }while(nodes.toPollFaster[nodes.idxNodeToPollFast]==pNodeToPoll  && --limitSecurity >0);
+                nodes.toPollFaster[nodes.idxNodeToPollFast]->second.elapse_time = seconds;
+                noToPollFound = true;
+                #if SHOW_AUTOMATIC_POLLING
+                    Serial.print(KYEL);
+                    Serial.println("High priority polling");
+                    Serial.print(KNRM);
+                #endif   
+            }
+
+            //NORMAL POLLING
+            else
+            {
+                for(int i=0; i<nodes.pool.size(); i++)
+                {
+                    if(++pNodeToPoll == nodes.pool.end()) 
+                        pNodeToPoll = nodes.pool.begin();
+
+                    if(nodes.toPollFaster.size()>0)
+                    {
+                        if(pNodeToPoll->first == nodes.toPollFaster[nodes.idxNodeToPollFast]->first) continue;
+                    }
+
+                    //if elapse time is expire
+                    if((seconds - pNodeToPoll->second.elapse_time ) >= pNodeToPoll->second.sample_rate || pNodeToPoll->second.elapse_time == 0) 
+                    {
+                        pNodeToPoll->second.elapse_time = seconds;
+                        pCurrentNode = pNodeToPoll;
+                        pPoll = pCurrentNode;
+                        noToPollFound = true;
+                        #if SHOW_AUTOMATIC_POLLING
+                            Serial.print(KYEL);
+                            Serial.println"Normal priority polling");
+                            Serial.print(KNRM);
+                        #endif   
+                        break;
+                    }
+                }
+                if(!noToPollFound && (nodes.toPollFaster.size()>0)){ toggle_polling=true; goto fastWhenNoNormal;}
+            }         
+
           #if SHOW_AUTOMATIC_POLLING
             Serial.println("time based polling mode");
           #endif          
-            
+            /*
             if(seconds - pCurrentNode->second.elapse_time >= pCurrentNode->second.sample_rate)
             {
                 //must_increase_polling_iterator = true;
@@ -964,6 +1028,10 @@ void SpidermeshApi::automaticNodePolling()
 
                 pPoll = pCurrentNode;
             }
+            */
+
+
+
         }
         else if(polling_mode == "fast")
         {
@@ -974,7 +1042,6 @@ void SpidermeshApi::automaticNodePolling()
             findNext();
             pPoll = pCurrentNode;
         }
-
 
         //if the 
         if(pPoll != nodes.pool.end())

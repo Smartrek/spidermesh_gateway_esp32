@@ -2,8 +2,10 @@
 
 DynamicJsonDocument SmkList::type_json(SIZE_OF_DYNAMIC_JSON_FILE);
 mesh_t SmkList::pool;
+PollingNodeList_t SmkList::toPollFaster;
 
 DefineParametersCb SmkList::cbDefineParameters;
+int SmkList::idxNodeToPollFast;
 
 
 //------------------------------------------------------------------------------------------------------------
@@ -45,7 +47,8 @@ mesh_t::iterator SmkList::addNode(JsonPair node)
         x.local =(j.containsKey("local"))?j["local"].as<bool>():false;
         x.sample_rate = (j.containsKey("srate"))?j["srate"].as<int>():0;
         x.priority = (j.containsKey("priority")) ? j["priority"].as<int>() : 0;
-        
+
+       
 
         //Internal variable of node
         x.nb_retry_count=0;
@@ -63,6 +66,11 @@ mesh_t::iterator SmkList::addNode(JsonPair node)
 
         //addition of the node into the pool list
         auto it = pool.insert(std::make_pair(x.mac.address,x));
+
+
+        //add node to priority list if needed
+        if( x.priority > 0) toPollFaster.push_back(find(x.mac.address));           
+
 
 
         if(j.containsKey("config")  &&  cbDefineParameters != NULL ) 

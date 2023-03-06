@@ -154,6 +154,8 @@ public:
 typedef std::map<uint32_t, SmkNode> mesh_t;
 typedef std::function<void(mesh_t::iterator pNode, apiframe packet, bool success, String tag)> ExpectCallback;
 typedef std::function<apiframe(mesh_t::iterator pNode)> RequestBuilderCallback;
+typedef std::map<uint32_t, SmkNode>::iterator NodeIterator_t;
+typedef std::vector<NodeIterator_t> PollingNodeList_t;
 
 typedef struct
 {
@@ -189,12 +191,9 @@ public:
 
 	static mesh_t pool;
 
-	// SmkNodeType smkType;
-	int _count;
-	String _fValues;
-	std::vector<String> trailList;
+	static PollingNodeList_t toPollFaster;
+	static int idxNodeToPollFast;
 
-	uint16_t retry_counter;
 
 public:
 	SmkList();
@@ -210,7 +209,7 @@ public:
 	static bool loadTypes(String json_string);
 
 	void assignTypeToNode();
-	mesh_t::iterator find(uint32_t add)
+	static mesh_t::iterator find(uint32_t add)
 	{
 		for (auto x = pool.begin(); x != pool.end(); x++)
 		{
