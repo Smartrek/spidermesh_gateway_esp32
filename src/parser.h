@@ -10,6 +10,13 @@
 #ifndef DEFAULT_UNIT_TYPE
 	#define DEFAULT_UNIT_TYPE "int16"
 #endif
+
+struct meta_conversion
+{
+	int64_t value;
+	uint8_t bitsize;
+};
+
 class SmkParser
 {
   public:
@@ -37,7 +44,7 @@ class SmkParser
 	 * @return true 
 	 * @return false 
 	 */
-	static bool rfPayloadToInt64(apiframe &packet, String tag, std::vector<int64_t>* payload, String &type);
+	static bool rfPayloadToInt64(apiframe &packet, String tag, std::vector<meta_conversion>* payload, String &type);
 
 	/**
 	 * @brief Convert the raw value into a readable user value according to parmeter of the variable

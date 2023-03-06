@@ -115,7 +115,7 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 	return true;
 }
 
-bool SmkParser::rfPayloadToInt64(apiframe &packet, String tag, std::vector<int64_t>* payload, String &type)
+bool SmkParser::rfPayloadToInt64(apiframe &packet, String tag, std::vector<meta_conversion>* payload, String &type)
 {
 	if(packet.size()<=10) return false;
 
@@ -138,7 +138,10 @@ bool SmkParser::rfPayloadToInt64(apiframe &packet, String tag, std::vector<int64
 
 	JsonObject extract_parameters = SmkList::type_json[type]["parser"][tag]["params"].as<JsonObject>();
 
-	payload->push_back(millis()); //getTimeFormated();
+	meta_conversion t;
+	t.value = millis();
+	t.bitsize = 64;
+	payload->push_back(t); //getTimeFormated();
 
 	for(auto x:extract_parameters)
 	{
@@ -209,7 +212,11 @@ bool SmkParser::rfPayloadToInt64(apiframe &packet, String tag, std::vector<int64
 		}
 		res = fResult;
 
-		payload->push_back(res);
+		meta_conversion mres;
+		mres.value = res;
+		mres.bitsize = len;
+
+		payload->push_back(mres);
 	}
 	return true;
 }
