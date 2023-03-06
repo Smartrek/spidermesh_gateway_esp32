@@ -202,6 +202,7 @@ public:
 	bool insertNewNodeInList(std::vector<SmkNode> *node_list, String node_line);
 
 	bool loadParamFiles();
+	bool writeNodeListToFile(const char* file = "/nodes.json");
 	static bool loadNodes(JsonVariant nodes_json);
 	static bool loadNodes(String nodes);
 	static bool addType(String type, JsonVariant src_type_json);

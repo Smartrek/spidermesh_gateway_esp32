@@ -137,6 +137,68 @@ bool SmkList::loadNodes(JsonVariant nodes_json)
   return true;
 }
 
+
+//------------------------------------------------------------------------------------------------------------
+bool SmkList::writeNodeListToFile(const char* file)
+{
+    
+    SPIFFS.remove(file);
+
+    //StaticJsonDocument<2000> nodeListJson;
+    DynamicJsonDocument nodeListJson(SIZE_OF_DYNAMIC_JSON_FILE);
+
+
+    Serial.println("------------ nodes that will be save -------------");
+
+    
+    String to_write="";
+    if(pool.size()) //if there is node
+    {
+        //for each node, form back a json node
+        for(auto n: pool)
+        {
+            String mac=String(n.second.mac.bOff[byte3]) + "." + String(n.second.mac.bOff[byte2]) + "." + String(n.second.mac.bOff[byte1]) + "." + String(n.second.mac.bOff[byte0]);
+            nodeListJson[n.first]["name"] = n.second.name;
+            if(n.second.group!="none") nodeListJson[n.first]["group"] = n.second.group;
+            nodeListJson[n.first]["type"] = n.second.type;
+            //write only if false, otherwise, consider enabled anyway
+            if(!n.second.enabled) nodeListJson[n.first]["enabled"] = n.second.enabled;
+            if(n.second.local)   nodeListJson[n.first]["local"]=true;
+            if(n.second.sample_rate!=0)nodeListJson[n.first]["sr"] = n.second.sample_rate;
+            if(n.second.priority>0)nodeListJson[n.first]["priority"] = n.second.priority;
+            n.second.parameters.addToJson(nodeListJson.as<JsonObject>());
+            
+            /*
+            Serial.println("  mac: " + mac);
+            Serial.println("  name: " + n.second.name);
+            Serial.println("  group: " + n.second.group);
+            Serial.println("  type: " + n.second.pType->first);
+            Serial.print  ("  mb_add: "); Serial.println(n.second.offsetMbReg);
+            Serial.print  ("  sample_rate: "); Serial.println(n.second.sample_rate);
+            Serial.print  ("  sample_rate: "); Serial.println(n.second.priority);
+            */
+        }
+
+        // Serialize JSON to file
+        if (serializeJson(nodeListJson, to_write) == 0) 
+        {
+          #if SHOW_NODE_DEBUG
+            Serial.println(F("Failed to write to file"));
+          #endif
+          return false;
+        }
+    }
+    else to_write="{}"; //if there is no node
+   
+    writeDirectlyToFile("/node_list.json", to_write.c_str());
+    Serial.println(to_write);
+    nodeListJson.clear();
+    
+    return true;
+}
+
+
+
 //------------------------------------------------------------------------------------------------------------
 JsonVariant SmkList::getTypeJsonVariant()
 {
@@ -362,6 +424,7 @@ String SmkList::macInt2String(uint32_t add)
     a.address = add;
     return String(a.bOff[3]) + "." + String(a.bOff[2]) + "." + String(a.bOff[1]) + "." + String(a.bOff[0]);
 }
+
 
 
 
