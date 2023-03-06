@@ -46,22 +46,14 @@ mesh_t::iterator SmkList::addNode(JsonPair node)
         x.enabled = (j.containsKey("enabled")) ? j["enabled"].as<bool>(): true;
         x.local =(j.containsKey("local"))?j["local"].as<bool>():false;
         x.sample_rate = (j.containsKey("srate"))?j["srate"].as<int>():0;
+        x.sample_rate = (j.containsKey("sr"))?j["sr"].as<int>():0;        
         x.priority = (j.containsKey("priority")) ? j["priority"].as<int>() : 0;
 
        
 
         //Internal variable of node
         x.nb_retry_count=0;
-        x.dataValid=false;
-        #if MODBUS_REGISTER_ENABLED
-        x.startAddresseModbusRegister = j["start_address"].as<int>();
-        #endif
-
-        x.elapse_time = 0;
-        #if MODBUS_REGISTER_ENABLED
-        x.valid_node_index_for_read_coil_bit = index_order_entry++;
-        #endif
-
+        x.dataValid=0;
         x.otaStep = STEP_INIT;
 
         //addition of the node into the pool list
@@ -75,6 +67,9 @@ mesh_t::iterator SmkList::addNode(JsonPair node)
 
         if(j.containsKey("config")  &&  cbDefineParameters != NULL ) 
             cbDefineParameters(j["config"].as<JsonObject>(),&pool[x.mac.address].parameters);
+
+
+        ret = find(x.mac.address);
 
         #if SHOW_LOAD_NODE_DEBUG
           Serial.print("  new node:");

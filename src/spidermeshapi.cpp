@@ -824,7 +824,7 @@ void SpidermeshApi::CheckIfAnswerWasExpectedAndCallSuccessFunction(apiframe rxPk
 
                     i->_expect_callback(i->_pNode, rxPkt, true, i->_tag);
 
-                    i->_pNode->second.dataValid = true;
+                    i->_pNode->second.dataValid = 1;
                   #if SHOW_EXPECT_EVENT
                     Serial.println("  data validity TRUE  <----------" + i->_pNode->second.name);
                   #endif
@@ -880,7 +880,7 @@ void SpidermeshApi::CheckExpectTimeout()
                 #if SHOW_EXPECT_EVENT
                 Serial.println("  data validity FALSE <---- " + i->_pNode->second.name);
                 #endif
-                i->_pNode->second.dataValid=false;
+                i->_pNode->second.dataValid=0;
                 i->_expect_callback(i->_pNode, dummy, false, i->_tag);//if user want to do something
 
                 i=listOfExpectedAnswer.erase(i);

@@ -120,7 +120,7 @@ public:
 	String group;
 	String type;
 	bool enabled;
-	bool dataValid;
+	uint8_t dataValid;
 	bool local;
 	uint16_t sample_rate;
 	uint16_t elapse_time;

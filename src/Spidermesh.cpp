@@ -654,7 +654,7 @@ bool Spidermesh::ProcessState(bool eob)
 							gateway_json[smac]["srate"]=-1;
 							//for loop as a work around to get a JsonPair
 							for(auto jp:gateway_json.as<JsonObject>()) gateway = nodes.addNode(jp);
-
+							gateway->second.pjson_type = nodes.type_json["gateway"].as<JsonVariant>();
 							
 							if(cbLoadExternalParamFiles){
 								cbLoadExternalParamFiles();
