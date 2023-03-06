@@ -28,6 +28,18 @@ class SmkParser
 	static bool rfPayloadToJson(apiframe &packet, String tag, JsonVariant payload, String &type, bool includeUnits=false);
 
 	/**
+	 * @brief Convert the raw RF payload to a raw 32bit values contain in uint64 variable. allow signe or unsigned 32bit max
+	 * 
+	 * @param packet RF payload
+	 * @param tag string that identify the RF payload definition from the JSON parser file
+	 * @param payload uint64 referebce to a vector that received the value converted
+	 * @param type type of the nodes to identify the right parser conversion
+	 * @return true 
+	 * @return false 
+	 */
+	static bool rfPayloadToInt64(apiframe &packet, String tag, std::vector<int64_t>* payload, String &type);
+
+	/**
 	 * @brief Convert the raw value into a readable user value according to parmeter of the variable
 	 * 
 	 * @param value raw value
