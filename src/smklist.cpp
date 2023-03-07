@@ -4,7 +4,7 @@ DynamicJsonDocument SmkList::type_json(SIZE_OF_DYNAMIC_JSON_FILE);
 mesh_t SmkList::pool;
 PollingNodeList_t SmkList::toPollFaster;
 
-DefineParametersCb SmkList::cbDefineParameters;
+
 int SmkList::idxNodeToPollFast;
 
 
@@ -39,7 +39,6 @@ mesh_t::iterator SmkList::addNode(JsonPair node)
 
         //load of group
         if(j.containsKey("group")) x.group = j["group"].as<String>();
-        else if(j.containsKey("trail")) x.group = j["trail"].as<String>(); //for legacy snofi
         else x.group = "";
         
         x.type = j["type"].as<String>();
@@ -49,12 +48,23 @@ mesh_t::iterator SmkList::addNode(JsonPair node)
         x.sample_rate = (j.containsKey("sr"))?j["sr"].as<int>():0;        
         x.priority = (j.containsKey("priority")) ? j["priority"].as<int>() : 0;
 
-       
+        if(j.containsKey("settings"))
+        {
+            for(auto s: j["settings"].as<JsonObject>())
+            {
+                setting_t t;
+                t.name = s.key().c_str();
+                t.value = s.value()["value"].as<uint32_t>();
+                t.type = (s.value().containsKey("type"))?s.value()["type"].as<String>():"int32";
+                x.settings.push_back(t);
+            }
+        }       
 
         //Internal variable of node
         x.nb_retry_count=0;
         x.dataValid=0;
         x.otaStep = STEP_INIT;
+
 
         //addition of the node into the pool list
         auto it = pool.insert(std::make_pair(x.mac.address,x));
@@ -63,10 +73,6 @@ mesh_t::iterator SmkList::addNode(JsonPair node)
         //add node to priority list if needed
         if( x.priority > 0) toPollFaster.push_back(find(x.mac.address));           
 
-
-
-        if(j.containsKey("config")  &&  cbDefineParameters != NULL ) 
-            cbDefineParameters(j["config"].as<JsonObject>(),&pool[x.mac.address].parameters);
 
 
         ret = find(x.mac.address);
@@ -161,7 +167,7 @@ bool SmkList::writeNodeListToFile(const char* file)
             if(n.second.local)   nodeListJson[n.first]["local"]=true;
             if(n.second.sample_rate!=0)nodeListJson[n.first]["sr"] = n.second.sample_rate;
             if(n.second.priority>0)nodeListJson[n.first]["priority"] = n.second.priority;
-            n.second.parameters.addToJson(nodeListJson.as<JsonObject>());
+            
             
             /*
             Serial.println("  mac: " + mac);
@@ -420,6 +426,16 @@ String SmkList::macInt2String(uint32_t add)
     return String(a.bOff[3]) + "." + String(a.bOff[2]) + "." + String(a.bOff[1]) + "." + String(a.bOff[0]);
 }
 
-
-
-
+//------------------------------------------------------------------------------------------------------------
+int32_t SmkNode::getSetting(String name)
+{
+    int32_t ret = 0; //default
+    for(auto s:settings)
+    {
+        if(s.name==name){
+            ret = s.value;
+            break;
+        } 
+    }
+    return ret;
+}

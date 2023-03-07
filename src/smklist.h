@@ -9,7 +9,7 @@
 #include <utils.h>
 #include "HardwareProfile.h"
 #include <map>
-#include <Parameters.h>
+
 
 enum
 {
@@ -108,7 +108,22 @@ enum step_t
 };
 
 
-typedef std::function<void(JsonObject jsonp, Parameter* p)> DefineParametersCb;
+struct setting_t
+{
+	String name;
+	uint32_t value;
+	String type;
+};
+
+union value_t
+{
+	uint32_t u32;
+	uint16_t u16[2];
+	uint8_t u8[4];
+	float f;
+};
+
+typedef std::vector<setting_t> settings_t;
 
 class SmkNode
 {
@@ -136,6 +151,7 @@ public:
 	FirmwareHost old_firmware_pyboard;
 	FirmwareHost new_firmware_pyboard;
 	String getMacAsString()	{ 	return String(mac.bOff[3]) + "." + String(mac.bOff[2]) + "." + String(mac.bOff[1]) + "." + String(mac.bOff[0]);	};
+	int32_t getSetting(String name);
 
 #if MODBUS_REGISTER_ENABLED
 	int startAddresseModbusRegister;
@@ -145,10 +161,8 @@ public:
 
 	// DynamicJsonDocument type_json;
 	JsonObject pjson_type;
-	Parameter parameters;
-
-
-
+	
+	settings_t settings;
 };
 
 typedef std::map<uint32_t, SmkNode> mesh_t;
@@ -198,7 +212,6 @@ public:
 public:
 	SmkList();
 
-	static DefineParametersCb cbDefineParameters;
 	bool insertNewNodeInList(std::vector<SmkNode> *node_list, String node_line);
 
 	bool loadParamFiles();
