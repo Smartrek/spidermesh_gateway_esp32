@@ -53,7 +53,6 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 		Serial.print(x.key().c_str());
 	  #endif
 
-
 		//get variable byte from the packet according to the definition of the variable position
 		for(int i=0; i<(len/8)+2 && ((idx_begin_data_byte+i) < packet.size()); i++)
 		{ 
@@ -74,7 +73,7 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 		Serial.println();
 	  #endif
 
-		long scaled_raw_data = getbits(unscaled_raw_data,begin%8,len);
+		uint64_t scaled_raw_data = getbits(unscaled_raw_data,begin%8,len);
 	  #if SHOW_DEBUG_EXTRACT_DATA
 		Serial.printf("  scaled: %lu, s: %d, len: %d", scaled_raw_data, begin%8, len);
 		Serial.print(" = ");
@@ -101,16 +100,27 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 			getErrorFromDict(def_params,payload,packet,11,type);
 		*/
 
+		String stype = DEFAULT_UNIT_TYPE; //default
+		if(def_params.containsKey("type")) stype = def_params["type"].as<String>();
+
+		bool c2f = !(stype=="int64");
+
 		fResult = applyParams(scaled_raw_data, def_params);
 
 		if(includeUnits && def_params.containsKey("u"))
 		{
 			JsonObject key = payload.createNestedObject(x.key());
-			key["value"]=fResult;
+			if(c2f)
+				key["value"]=fResult;
+			else
+			{
+				char buf[40];
+				sprintf(buf,"%lld",scaled_raw_data);
+				key["value"]=buf;
+			}
 			key["units"]=def_params["u"];
-
 		}
-		else payload[x.key()] = fResult;
+		else payload[x.key()] = (c2f)?fResult:scaled_raw_data;
 	}
 	return true;
 }
@@ -182,7 +192,7 @@ bool SmkParser::rfPayloadToInt64(apiframe &packet, String tag, std::vector<meta_
 		Serial.println();
 	  #endif
 
-		long scaled_raw_data = getbits(unscaled_raw_data,begin%8,len);
+		uint64_t scaled_raw_data = getbits(unscaled_raw_data,begin%8,len);
 	  #if SHOW_DEBUG_EXTRACT_DATA
 		Serial.printf("  scaled: %lu, s: %d, len: %d", scaled_raw_data, begin%8, len);
 		Serial.print(" = ");

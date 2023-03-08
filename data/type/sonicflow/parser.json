@@ -1,0 +1,16 @@
+{
+  "parser":
+  {
+    "status":{
+      "params":{
+        "rssi":{"pos":[0,8]},
+        "battery":{"pos":[8,8],"gain":20, "fix":2, "u":"V"},
+        "distance":{"pos":[16,16],"fix":1, "u":"m"},
+        "flow":{"pos":[32,24], "type":"float24", "u":"L/s"},
+        "totalizer":{"pos":[56,64], "type":"int64", "u":"L"},
+        "error":{"pos":[120,5]},
+        "code":{"pos":[125,3]}
+      }
+    }
+  }
+}

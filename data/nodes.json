@@ -1,35 +1,35 @@
 {
-    "0.0.64.184": {
+    "0.0.0.184": {
         "name": "Location 1",
-        "type": "vacuum",
+        "type": "sonicflow",
         "settings":{"offset":{"value":0}},
         "priority":1
     },
-    "0.0.64.185": {
+    "0.0.0.185": {
         "name": "Location 2",
-        "type": "vacuum",
-        "settings":{"offset":{"value":10}},
+        "type": "sonicflow",
+        "settings":{"offset":{"value":20}},
         "priority":1
     },
-    "0.0.64.186": {
+    "0.0.0.186": {
         "name": "Location 3",
-        "type": "vacuum",
-        "settings":{"offset":{"value":20}},
+        "type": "sonicflow",
+        "settings":{"offset":{"value":40}},
         "priority":1
     },
     "0.0.234.186": {
         "name": "Repeater 1",
         "type": "repeater",
-        "settings":{"offset":{"value":30}}
+        "settings":{"offset":{"value":60}}
     },           
     "0.0.234.192": {
         "name": "Repeater 2",
         "type": "repeater",
-        "settings":{"offset":{"value":40}}
+        "settings":{"offset":{"value":80}}
     },           
     "0.0.234.195": {
         "name": "Repeater 3",
         "type": "repeater",
-        "settings":{"offset":{"value":50}}
+        "settings":{"offset":{"value":100}}
     }
 }
