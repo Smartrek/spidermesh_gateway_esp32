@@ -17,7 +17,7 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 	if(SmkList::type_json[type]["parser"].containsKey(tag))
 	{
 		#if SHOW_DEBUG_EXTRACT_DATA
-		Serial.print("  default status key is founded");
+		Serial.println("  default status key is founded");
 		#endif
 
 	}
@@ -122,7 +122,7 @@ bool SmkParser::rfPayloadToInt64(apiframe &packet, String tag, std::vector<meta_
 	if(SmkList::type_json[type]["parser"].containsKey(tag))
 	{
 		#if SHOW_DEBUG_EXTRACT_DATA
-		Serial.print("  default status key is founded");
+		Serial.println("  default status key is founded");
 		#endif
 
 	}
@@ -196,14 +196,6 @@ bool SmkParser::rfPayloadToInt64(apiframe &packet, String tag, std::vector<meta_
 
 		//if number is 16bits signed and is negative, convert in negative int 32bit
 
-		if(def_params.containsKey("fix"))
-		{
-			int fix = def_params["fix"].as<int>();
-			int fix_apply = 1;
-			for(int i=0;i<fix;i++) fix_apply *= 10;
-			fResult *= fix_apply;				
-		}
-
 		int64_t res;
 		if(stype == "float")
 		{
@@ -267,15 +259,6 @@ double SmkParser::applyParams(int64_t value, JsonObject def_params)
 	#if SHOW_DEBUG_EXTRACT_DATA
 	Serial.println();
 	#endif
-
-	//put inside json payload
-	if(def_params.containsKey("fix"))
-	{
-		int fix = def_params["fix"].as<int>();
-		int fix_apply = 1;
-		for(int i=0;i<fix;i++) fix_apply *= 10;
-		fResult /= fix_apply;
-	}
 
 	return fResult;
 }
