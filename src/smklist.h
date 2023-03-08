@@ -131,7 +131,6 @@ public:
 	String name;
 	u_mac mac;
 	int16_t id;
-
 	String group;
 	String type;
 	bool enabled;
@@ -147,21 +146,12 @@ public:
 	uint8_t nbFailed;
 	FirmwareVersion old_firmware;
 	FirmwareVersion new_firmware;
-
 	FirmwareHost old_firmware_pyboard;
 	FirmwareHost new_firmware_pyboard;
 	String getMacAsString()	{ 	return String(mac.bOff[3]) + "." + String(mac.bOff[2]) + "." + String(mac.bOff[1]) + "." + String(mac.bOff[0]);	};
 	int32_t getSetting(String name);
-
-#if MODBUS_REGISTER_ENABLED
-	int startAddresseModbusRegister;
-	int valid_node_index_for_read_coil_bit;
-#endif
 	uint16_t nb_retry_count; // watchdog
-
-	// DynamicJsonDocument type_json;
 	JsonObject pjson_type;
-	
 	settings_t settings;
 };
 

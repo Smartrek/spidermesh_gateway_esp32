@@ -64,10 +64,11 @@ mesh_t::iterator SmkList::addNode(JsonPair node)
         x.nb_retry_count=0;
         x.dataValid=0;
         x.otaStep = STEP_INIT;
-
+        Serial.println("************************************************************1"); delay(100);
 
         //addition of the node into the pool list
         auto it = pool.insert(std::make_pair(x.mac.address,x));
+        Serial.println("************************************************************2"); delay(100);
 
 
         //add node to priority list if needed
@@ -280,7 +281,6 @@ bool SmkList::loadParamFiles()
             new_type.shrinkToFit();
 
           addType(n.second.type, new_type.as<JsonVariant>());           //insert the type in json format in the list of supported type
-          n.second.pjson_type=type_json[n.second.type].as<JsonVariant>();   //get a pointer type for the node
 
           #if SHOW_LOAD_NODE_DEBUG
             Serial.printf("--------------------------------\r\n");

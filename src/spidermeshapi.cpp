@@ -813,24 +813,15 @@ void SpidermeshApi::CheckIfAnswerWasExpectedAndCallSuccessFunction(apiframe rxPk
                 
                 if(add_rx.address== i->_pNode->second.mac.address)
                 {
-
                   #if SHOW_EXPECT_EVENT
                     Serial.println(" == expect match found");
                   #endif
-
-                  #if MODBUS_REGISTER_ENABLED
-                    Helper::PollPacketToModbusRegister(i->_pNode, rxPkt);
-                  #endif
-
                     i->_expect_callback(i->_pNode, rxPkt, true, i->_tag);
-
                     i->_pNode->second.dataValid = 1;
                   #if SHOW_EXPECT_EVENT
                     Serial.println("  data validity TRUE  <----------" + i->_pNode->second.name);
                   #endif
-
                     i=listOfExpectedAnswer.erase(i);
-
                     break;
                 }
             }

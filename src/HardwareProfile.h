@@ -43,18 +43,12 @@
 #define RTC_ENABLED 0
 #define SD_CARD_ENABLED 0
 
-
-
-
-
-#define MODBUS_REGISTER_ENABLED false
-
 #define MQTT_PARSER_ENABLED true
 
 #define MIN_WEBOTA_REQUIRED false
 
 //-----------------------------------------------------
-#define BAUDRATE_MODBUS_RTU 9600
+
 #define SLAVE_ID 1
 
 //-----------------------------------------------------
@@ -62,13 +56,6 @@
 //#define PORTIA_RESET 10
 #define RX_PORTIA 36
 #define TX_PORTIA 4
-
-#if MODBUS_RTU != 0
-#define RX_MODBUS_RTU 39
-#define TX_MODBUS_RTU 15
-#endif
-
-
 
 #if RTC_ENABLED != 0
 
@@ -94,11 +81,6 @@
 
 #define CTS_PORTIA 33
 #define RESET_PORTIA 32
-
-#if MODBUS_RTU != 0
-#define RX_MODBUS_RTU 39 //conflit avec external power sense sur cette pin
-#define TX_MODBUS_RTU 16
-#endif
 
 #define BATTERY_MEASUREMENT_PIN 35
 #define EXTERNAL_POWER_SENSE    39
