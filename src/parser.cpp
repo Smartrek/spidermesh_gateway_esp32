@@ -232,7 +232,9 @@ double SmkParser::applyParams(int64_t value, JsonObject def_params)
 	if(stype=="int16" && (value &0x8000)) value |= 0xFFFFFFFFFFFF0000;
 	else if(stype=="int32" && value &(0x80000000)) value |= 0xFFFFFFFF00000000;
 
+	#if SHOW_DEBUG_EXTRACT_DATA
 	Serial.printf("before %lld", value);
+	#endif
 	if(stype == "float") 	fResult = *((float*) &value);
 	else 					fResult = value;
 
