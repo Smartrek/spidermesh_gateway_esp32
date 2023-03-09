@@ -205,7 +205,6 @@ bool SmkParser::rfPayloadToInt64(apiframe &packet, String tag, std::vector<meta_
 		{
 			fResult = applyParams(scaled_raw_data, def_params);
 			res = fResult;
-			Serial.printf("out: %lld",res);
 		} 
 
 		
