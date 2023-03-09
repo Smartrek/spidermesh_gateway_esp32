@@ -436,7 +436,6 @@ public:
 
 	static void AddToTerminalBuffer(String head, apiframe *cmd);
 
-protected:
 	static mesh_t::iterator find(uint32_t add)
 	{
 		for (auto x = nodes.pool.begin(); x != nodes.pool.end(); x++)
