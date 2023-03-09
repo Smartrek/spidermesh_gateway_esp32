@@ -53,6 +53,7 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 		Serial.print(x.key().c_str());
 	  #endif
 
+
 		//get variable byte from the packet according to the definition of the variable position
 		for(int i=0; i<(len/8)+2 && ((idx_begin_data_byte+i) < packet.size()); i++)
 		{ 
@@ -73,7 +74,7 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 		Serial.println();
 	  #endif
 
-		uint64_t scaled_raw_data = getbits(unscaled_raw_data,begin%8,len);
+		long scaled_raw_data = getbits(unscaled_raw_data,begin%8,len);
 	  #if SHOW_DEBUG_EXTRACT_DATA
 		Serial.printf("  scaled: %lu, s: %d, len: %d", scaled_raw_data, begin%8, len);
 		Serial.print(" = ");
@@ -100,27 +101,16 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 			getErrorFromDict(def_params,payload,packet,11,type);
 		*/
 
-		String stype = DEFAULT_UNIT_TYPE; //default
-		if(def_params.containsKey("type")) stype = def_params["type"].as<String>();
-
-		bool c2f = !(stype=="int64");
-
 		fResult = applyParams(scaled_raw_data, def_params);
 
 		if(includeUnits && def_params.containsKey("u"))
 		{
 			JsonObject key = payload.createNestedObject(x.key());
-			if(c2f)
-				key["value"]=fResult;
-			else
-			{
-				char buf[40];
-				sprintf(buf,"%lld",scaled_raw_data);
-				key["value"]=buf;
-			}
+			key["value"]=fResult;
 			key["units"]=def_params["u"];
+
 		}
-		else payload[x.key()] = (c2f)?fResult:scaled_raw_data;
+		else payload[x.key()] = fResult;
 	}
 	return true;
 }
@@ -173,46 +163,52 @@ bool SmkParser::rfPayloadToInt64(apiframe &packet, String tag, std::vector<meta_
 
 
 		//get variable byte from the packet according to the definition of the variable position
-		for(int i=0; i<(len/8)+2 && ((idx_begin_data_byte+i) < packet.size()); i++)
+		int nbIt = (len/8);
+		if(len%8) nbIt++;
+		for(int i=0; i<nbIt && ((idx_begin_data_byte+i) < packet.size()); i++)
 		{ 
-			long b = packet[idx_begin_data_byte+i];
+			uint64_t b = packet[idx_begin_data_byte+i];
 			unscaled_raw_data += b << (i*8);
 		  #if SHOW_DEBUG_EXTRACT_DATA
 			Serial.printf(" i%d: ",i);
 			Serial.print(idx_begin_data_byte+i);
-			Serial.printf(" d: ");
-			Serial.print(packet[idx_begin_data_byte+i]);
+			Serial.printf(" h:%02x ", packet[idx_begin_data_byte+i]);
+			//Serial.print(packet[idx_begin_data_byte+i]);
 
 			Serial.print(" - ");
 		  #endif
 		}
 
 	  #if SHOW_DEBUG_EXTRACT_DATA
-	  	Serial.printf("  unscaled: %lu, hex: %x", unscaled_raw_data, unscaled_raw_data);
+	  	Serial.printf("  unscaled: %llu, hex: %x", unscaled_raw_data, unscaled_raw_data);
 		Serial.println();
 	  #endif
 
 		uint64_t scaled_raw_data = getbits(unscaled_raw_data,begin%8,len);
 	  #if SHOW_DEBUG_EXTRACT_DATA
-		Serial.printf("  scaled: %lu, s: %d, len: %d", scaled_raw_data, begin%8, len);
+		Serial.printf("  scaled: %llu, s: %d, len: %d", scaled_raw_data, begin%8, len);
 		Serial.print(" = ");
 		Serial.println(scaled_raw_data);
 	  #endif
 
-		fResult = applyParams(scaled_raw_data, def_params);
-
 		String stype = DEFAULT_UNIT_TYPE; //default
-		if(def_params.containsKey("type")) stype = def_params["type"].as<String>();
+		if(def_params.containsKey("type")) stype = def_params["type"].as<String>();	 
 
 		//if number is 16bits signed and is negative, convert in negative int 32bit
 
 		int64_t res;
-		if(stype == "float")
+		if(stype=="float24")
+			scaled_raw_data <<= 8;
+		if(stype == "int64" || stype == "float" || stype =="float24")
+			res = scaled_raw_data;
+		else
 		{
-			float fres = fResult;
-			res = *((uint32_t*)(&fres));
-		}
-		res = fResult;
+			fResult = applyParams(scaled_raw_data, def_params);
+			res = fResult;
+			Serial.printf("out: %lld",res);
+		} 
+
+		
 
 		meta_conversion mres;
 		mres.value = res;
@@ -227,16 +223,16 @@ bool SmkParser::rfPayloadToInt64(apiframe &packet, String tag, std::vector<meta_
 
 double SmkParser::applyParams(int64_t value, JsonObject def_params)
 {
-	double fResult = value;
+	double fResult = 0;
 
 	String stype = DEFAULT_UNIT_TYPE; //default
 	if(def_params.containsKey("type")) stype = def_params["type"].as<String>();
 
 	//if number is 16bits signed and is negative, convert in negative int 32bit
-	if(stype=="int16" && value &0x8000) value |= 0xFFFFFFFFFFFF0000;
-	else if(stype=="int32" && value &0x80000000) value |= 0xFFFFFFFF00000000;
+	if(stype=="int16" && (value &0x8000)) value |= 0xFFFFFFFFFFFF0000;
+	else if(stype=="int32" && value &(0x80000000)) value |= 0xFFFFFFFF00000000;
 
-
+	Serial.printf("before %lld", value);
 	if(stype == "float") 	fResult = *((float*) &value);
 	else 					fResult = value;
 
@@ -267,7 +263,7 @@ double SmkParser::applyParams(int64_t value, JsonObject def_params)
 	}
 		
 	#if SHOW_DEBUG_EXTRACT_DATA
-	Serial.println();
+	Serial.printf("after %lf\n", fResult);
 	#endif
 
 	return fResult;
