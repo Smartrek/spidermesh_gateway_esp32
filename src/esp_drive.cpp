@@ -76,6 +76,34 @@ void initDrive()
 #endif
 }
 
+
+std::vector<String> getTypeNode()
+{
+    std::vector<String> ret;
+
+    File root = SPIFFS.open("/");
+    File file = root.openNextFile();
+
+    while(file){
+        String fname = file.path();
+        String sub = fname.substring(1,5);
+        if(sub == "type")
+        {
+            fname = fname.substring(6);
+            int len = fname.length();
+
+            String type = fname.substring(0,len-12);
+
+            ret.push_back(type);
+            Serial.print("type: ");
+            Serial.println(type);
+
+        }
+        file = root.openNextFile();
+    }
+    return ret;
+}
+
 void printDirectory(File dir, int numTabs)
 {
     while (true)

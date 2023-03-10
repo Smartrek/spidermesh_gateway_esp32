@@ -21,7 +21,7 @@ void writeFile(fs::FS &fs, const char * path, const char * message);
 
 String readNodeListFile();
 
-
+std::vector<String> getTypeNode();
 String readNodeTypeFile();
 bool writeDirectlyToFile(char* name, String content);
 String readFile(String filename);
