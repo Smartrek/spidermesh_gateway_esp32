@@ -461,11 +461,11 @@ protected:
 
 
 protected:
-	static firmware_t firmware;
 	static bool findNext(bool onlyRemote=true, bool initSearch=false);
 	static bool isStepCompleted(bool otaActiveOnly=true);
 
 public:
+	static firmware_t firmware;
 	static apiframe apiPacket(uint8_t cmd, apiframe pkt, bool local=true, bool broadcastOtaUpdate = false, uint8_t phase = 0);
 	static apiframe apiPacket(mesh_t::iterator pNode, uint8_t cmd, apiframe pkt, bool local=true, bool broadcastOtaUpdate = false, uint8_t phase = 0);
 
