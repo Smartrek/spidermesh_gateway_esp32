@@ -293,7 +293,11 @@ public:
 	static String polling_mode;
 	static uint32_t focus_node;
 	static unsigned char idx_buf;
+	
+	static void enableTerminalRecord(bool enabled){enable_terminal_record=enabled;};
+	static bool enable_terminal_record;
 	static std::list<String> terminalBuffer;
+
 
 	static long timeout_expect;
 	static unsigned long previousMillisExpectPacketReceived;

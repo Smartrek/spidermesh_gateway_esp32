@@ -42,6 +42,7 @@ uint16_t SpidermeshApi::_duration_focus_on_node_polling;
 
 //std::vector <mesh_t::iterator> SpidermeshApi::otaList;
 
+bool SpidermeshApi::enable_terminal_record;
 std::list<String> SpidermeshApi::terminalBuffer;
 long SpidermeshApi::timeout_expect;
 unsigned long SpidermeshApi::previousMillisExpectPacketReceived;
@@ -96,6 +97,7 @@ SpidermeshApi::SpidermeshApi()
     cbWhenPacketReceived = [](apiframe){};
 
     mutexExpect = portMUX_INITIALIZER_UNLOCKED;
+    enable_terminal_record = false;
 }
 
 bool SpidermeshApi::init()
@@ -350,9 +352,7 @@ bool SpidermeshApi::parseReceivedData()
                     }
                     if(iseob) OptimalDelay();                 //delay for other thread
 
-                  #if TERMINAL_ENABLED
-                    AddToTerminalBuffer("in :", &current_packet);
-                  #endif                    
+                    if(enable_terminal_record) AddToTerminalBuffer("in :", &current_packet);
 
                     state_serial = STATE_SOF;
                 }
@@ -533,9 +533,7 @@ String SpidermeshApi::sendCommand(apiframe cmd)
     printApiPacket(cmd, "out: ");    
     //Serial.println(cmd_out);
     #endif
-    #if TERMINAL_ENABLED
-    AddToTerminalBuffer("out:", &cmd);
-    #endif
+    if(enable_terminal_record) AddToTerminalBuffer("out:", &cmd);
 
     return cmd_out;
 }
