@@ -234,6 +234,7 @@ public:
 	void addParamToUpdate(String node_name, String name, String value) { listParam.push_back(ParamList_t(node_name, name, value)); };
 
 	static mesh_t::iterator addNode(JsonPair node);
+	static mesh_t::iterator addNode(JsonObject node);
 	String isMacExist(String mac);
 	String isMacExist(uint32_t umac);
 

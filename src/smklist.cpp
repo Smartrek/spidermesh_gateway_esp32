@@ -14,6 +14,14 @@ SmkList::SmkList()
 
 }
 
+mesh_t::iterator SmkList::addNode(JsonObject node)
+{
+    mesh_t::iterator  ret;
+    for(auto jp:node) ret = addNode(jp);
+    ret->second.pjson_type = type_json["gateway"].as<JsonVariant>();
+    return ret;
+}
+
 mesh_t::iterator SmkList::addNode(JsonPair node)
 {
     mesh_t::iterator ret = pool.end();
@@ -64,11 +72,9 @@ mesh_t::iterator SmkList::addNode(JsonPair node)
         x.nb_retry_count=0;
         x.dataValid=0;
         x.otaStep = STEP_INIT;
-        Serial.println("************************************************************1"); delay(100);
 
         //addition of the node into the pool list
         auto it = pool.insert(std::make_pair(x.mac.address,x));
-        Serial.println("************************************************************2"); delay(100);
 
 
         //add node to priority list if needed
@@ -147,10 +153,11 @@ bool SmkList::writeNodeListToFile(const char* file)
     SPIFFS.remove(file);
 
     //StaticJsonDocument<2000> nodeListJson;
-    DynamicJsonDocument nodeListJson(SIZE_OF_DYNAMIC_JSON_FILE);
+    DynamicJsonDocument nodeListJson(5000);//SIZE_OF_DYNAMIC_JSON_FILE);
 
 
     Serial.println("------------ nodes that will be save -------------");
+    Serial.println(ESP.getFreeHeap());
 
     
     String to_write="";
@@ -159,28 +166,39 @@ bool SmkList::writeNodeListToFile(const char* file)
         //for each node, form back a json node
         for(auto n: pool)
         {
-            String mac=String(n.second.mac.bOff[byte3]) + "." + String(n.second.mac.bOff[byte2]) + "." + String(n.second.mac.bOff[byte1]) + "." + String(n.second.mac.bOff[byte0]);
-            nodeListJson[n.first]["name"] = n.second.name;
-            if(n.second.group!="none") nodeListJson[n.first]["group"] = n.second.group;
-            nodeListJson[n.first]["type"] = n.second.type;
+            String smac = n.second.getMacAsString();
+            nodeListJson[smac]["name"] = n.second.name;
+            if(n.second.group!="") nodeListJson[smac]["group"] = n.second.group;
+            nodeListJson[smac]["type"] = n.second.type;
             //write only if false, otherwise, consider enabled anyway
-            if(!n.second.enabled) nodeListJson[n.first]["enabled"] = n.second.enabled;
-            if(n.second.local)   nodeListJson[n.first]["local"]=true;
-            if(n.second.sample_rate!=0)nodeListJson[n.first]["sr"] = n.second.sample_rate;
-            if(n.second.priority>0)nodeListJson[n.first]["priority"] = n.second.priority;
-            
-            
-            /*
-            Serial.println("  mac: " + mac);
+            if(!n.second.enabled) nodeListJson[smac]["enabled"] = n.second.enabled;
+            if(n.second.local)   nodeListJson[smac]["local"]=true;
+            if(n.second.sample_rate!=0)nodeListJson[smac]["sr"] = n.second.sample_rate;
+            if(n.second.priority>0)nodeListJson[smac]["priority"] = n.second.priority;
+
+
+            if(n.second.settings.size()>0)
+            {
+                nodeListJson[smac].createNestedObject("settings");
+                for(auto s:n.second.settings)
+                {
+                    nodeListJson[smac]["settings"].createNestedObject(s.name);
+                    nodeListJson[smac]["settings"][s.name].createNestedObject("value");
+                    nodeListJson[smac]["settings"][s.name]["value"] = n.second.getSetting(s.name);
+                }   
+            }
+
+                           
+            Serial.println("  mac: " + n.second.getMacAsString());
             Serial.println("  name: " + n.second.name);
             Serial.println("  group: " + n.second.group);
-            Serial.println("  type: " + n.second.pType->first);
-            Serial.print  ("  mb_add: "); Serial.println(n.second.offsetMbReg);
+            Serial.println("  type: " + n.second.type);
+            Serial.print  ("  mb_add: "); Serial.println(n.second.getSetting("offset"));
             Serial.print  ("  sample_rate: "); Serial.println(n.second.sample_rate);
-            Serial.print  ("  sample_rate: "); Serial.println(n.second.priority);
-            */
+            Serial.print  ("  priority: "); Serial.println(n.second.priority);
+            
         }
-
+        nodeListJson.shrinkToFit();
         // Serialize JSON to file
         if (serializeJson(nodeListJson, to_write) == 0) 
         {
@@ -189,10 +207,12 @@ bool SmkList::writeNodeListToFile(const char* file)
           #endif
           return false;
         }
+        nodeListJson.clear(); // to free RAM
     }
     else to_write="{}"; //if there is no node
-   
-    writeDirectlyToFile("/node_list.json", to_write.c_str());
+    
+
+    writeDirectlyToFile("/nodes.json", to_write.c_str());
     Serial.println(to_write);
     nodeListJson.clear();
     
