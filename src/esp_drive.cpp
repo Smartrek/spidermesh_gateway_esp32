@@ -23,7 +23,7 @@
 #define SHOW_SPIFFS_CONTENT false
 #endif
 
-uint8_t systemOkToWrite = false;
+uint8_t systemOkToWrite = true;
 const char *node_list_file = "/nodes.json";
 const char *node_type_file = "/node_type.txt";
 

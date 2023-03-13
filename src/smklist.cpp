@@ -153,7 +153,7 @@ bool SmkList::writeNodeListToFile(const char* file)
     SPIFFS.remove(file);
 
     //StaticJsonDocument<2000> nodeListJson;
-    DynamicJsonDocument nodeListJson(5000);//SIZE_OF_DYNAMIC_JSON_FILE);
+    DynamicJsonDocument nodeListJson(10000);//SIZE_OF_DYNAMIC_JSON_FILE);
 
 
     Serial.println("------------ nodes that will be save -------------");
