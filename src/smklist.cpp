@@ -149,7 +149,11 @@ bool SmkList::loadNodes(JsonVariant nodes_json)
 //------------------------------------------------------------------------------------------------------------
 bool SmkList::writeNodeListToFile(const char* file)
 {
-    
+    if (!systemOkToWrite)
+    {
+        Serial.println("Error system not ready to write");
+        return false;
+    }    
     SPIFFS.remove(file);
 
     //StaticJsonDocument<2000> nodeListJson;

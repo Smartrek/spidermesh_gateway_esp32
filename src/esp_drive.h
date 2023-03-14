@@ -28,6 +28,7 @@ String readFile(String filename);
 String cleanString(String toClean);
 bool isValidMac(String mac);
 void setConditionStateWriteFile(bool state);
+bool getConditionDrive();
 void findFileTypeExtension(char *dir, listFile_t *listRetFile, String extension);
 
 

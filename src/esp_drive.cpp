@@ -34,6 +34,11 @@ void setConditionStateWriteFile(bool state)
     systemOkToWrite = state;
 }
 
+bool getConditionDrive()
+{
+    return systemOkToWrite;
+}
+
 void initDrive()
 {
     // Initialize SPIFFS managment of files from spi chip
@@ -243,7 +248,7 @@ String readNodeListFile()
 //------------------------------------------------------------------------------
 bool writeDirectlyToFile(char *name, String content)
 {
-    if (!systemOkToWrite)
+    if (getConditionDrive())
     {
         Serial.println("Error system not ready to write");
         return false;

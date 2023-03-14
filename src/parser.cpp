@@ -1,11 +1,12 @@
 #include <parser.h>
 
 
+
 bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payload, String &type, bool includeUnits)
 {
 	if(packet.size()<=10) return false;
 
-  #if SHOW_DEBUG_EXTRACT_DATA
+  #if SHOW_DEBUG_EXTRACT_DATAJSON
 	Serial.println("\r\n-- Extraction parameter from json definition --");
 	Serial.print ("  --> tag: ");
 	Serial.println (tag);
@@ -16,13 +17,13 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 
 	if(SmkList::type_json[type]["parser"].containsKey(tag))
 	{
-		#if SHOW_DEBUG_EXTRACT_DATA
+		#if SHOW_DEBUG_EXTRACT_DATAJSON
 		Serial.println("  default status key is founded");
 		#endif
 
 	}
 	else{
-		#if SHOW_DEBUG_EXTRACT_DATA
+		#if SHOW_DEBUG_EXTRACT_DATAJSON
 		Serial.println("Key Not valid, skip extraction");
 		#else
 		Serial.print("!");
@@ -47,7 +48,7 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 		int idx_begin_data_byte = begin/8 + 10;//11 is begin of data
 		uint64_t unscaled_raw_data = 0;
 
-	  #if SHOW_DEBUG_EXTRACT_DATA
+	  #if SHOW_DEBUG_EXTRACT_DATAJSON
 		Serial.print("  ==>> ");
 		Serial.printf("  begin: %d, len: %d, label:", begin, len);
 		Serial.print(x.key().c_str());
@@ -55,11 +56,13 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 
 
 		//get variable byte from the packet according to the definition of the variable position
-		for(int i=0; i<(len/8)+2 && ((idx_begin_data_byte+i) < packet.size()); i++)
+		int nbIt = (len/8);
+		if(len%8) nbIt++;
+		for(int i=0; i<nbIt && ((idx_begin_data_byte+i) < packet.size()); i++)
 		{ 
-			long b = packet[idx_begin_data_byte+i];
+			uint64_t b = packet[idx_begin_data_byte+i];
 			unscaled_raw_data += b << (i*8);
-		  #if SHOW_DEBUG_EXTRACT_DATA
+		  #if SHOW_DEBUG_EXTRACT_DATAJSON
 			Serial.printf(" i%d: ",i);
 			Serial.print(idx_begin_data_byte+i);
 			Serial.printf(" d: ");
@@ -69,13 +72,13 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 		  #endif
 		}
 
-	  #if SHOW_DEBUG_EXTRACT_DATA
+	  #if SHOW_DEBUG_EXTRACT_DATAJSON
 	  	Serial.printf("  unscaled: %lu, hex: %x", unscaled_raw_data, unscaled_raw_data);
 		Serial.println();
 	  #endif
 
-		long scaled_raw_data = getbits(unscaled_raw_data,begin%8,len);
-	  #if SHOW_DEBUG_EXTRACT_DATA
+		uint64_t scaled_raw_data = getbits(unscaled_raw_data,begin%8,len);
+	  #if SHOW_DEBUG_EXTRACT_DATAJSON
 		Serial.printf("  scaled: %lu, s: %d, len: %d", scaled_raw_data, begin%8, len);
 		Serial.print(" = ");
 		Serial.println(scaled_raw_data);
@@ -101,16 +104,46 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 			getErrorFromDict(def_params,payload,packet,11,type);
 		*/
 
-		fResult = applyParams(scaled_raw_data, def_params);
+
+		String stype = DEFAULT_UNIT_TYPE; //default
+		if(def_params.containsKey("type")) stype = def_params["type"].as<String>();
+
 
 		if(includeUnits && def_params.containsKey("u"))
 		{
 			JsonObject key = payload.createNestedObject(x.key());
-			key["value"]=fResult;
+			int64_t res;
+			if(stype=="float24" || stype == "float")
+			{
+				if(stype=="float24") scaled_raw_data <<= 8;
+				key["value"] = *((float*) (&scaled_raw_data));
+			}
+			else if(stype == "int64")
+				key["value"] = scaled_raw_data;
+			else
+			{
+				fResult = applyParams(scaled_raw_data, def_params);
+				key["value"] = fResult;
+			} 
 			key["units"]=def_params["u"];
-
 		}
-		else payload[x.key()] = fResult;
+		else
+		{
+			int64_t res;
+			if(stype=="float24" || stype == "float")
+			{
+				if(stype=="float24") scaled_raw_data <<= 8;
+				payload[x.key()] = *((float*) (&scaled_raw_data));
+			}
+				
+			else if(stype == "int64")
+				payload[x.key()] = scaled_raw_data;
+			else
+			{
+				fResult = applyParams(scaled_raw_data, def_params);
+				payload[x.key()] = fResult;
+			} 
+		}
 	}
 	return true;
 }
