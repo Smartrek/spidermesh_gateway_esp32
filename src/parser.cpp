@@ -119,7 +119,11 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 				key["value"] = *((float*) (&scaled_raw_data));
 			}
 			else if(stype == "int64")
-				key["value"] = scaled_raw_data;
+			{
+				char buffer[50];
+				sprintf(buffer, "%lld", scaled_raw_data);				
+				key["value"] = buffer;
+			}
 			else
 			{
 				fResult = applyParams(scaled_raw_data, def_params);
@@ -137,7 +141,11 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 			}
 				
 			else if(stype == "int64")
-				payload[x.key()] = scaled_raw_data;
+			{
+				char buffer[50];
+				sprintf(buffer, "%lld", scaled_raw_data);
+				payload[x.key()] = buffer;
+			}
 			else
 			{
 				fResult = applyParams(scaled_raw_data, def_params);

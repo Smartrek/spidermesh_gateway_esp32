@@ -149,7 +149,7 @@ bool SmkList::loadNodes(JsonVariant nodes_json)
 //------------------------------------------------------------------------------------------------------------
 bool SmkList::writeNodeListToFile(const char* file)
 {
-    if (!systemOkToWrite)
+    if (!getConditionDrive())
     {
         Serial.println("Error system not ready to write");
         return false;
