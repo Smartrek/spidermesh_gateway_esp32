@@ -395,6 +395,26 @@ void SmkList::assignTypeToNode()
           Serial.println("Type to assign does't exist");
     }  
 }
+//------------------------------------------------------------------------------------------------------------
+int SmkList::getNbBytePerLog(mesh_t::iterator  pNode)
+{
+    int param_pos=0;
+    int param_size=0;
+    for(auto p:type_json[pNode->second.type]["status"]["params"].as<JsonObject>())
+    {
+        auto idx = p.value().as<JsonObject>()["pos"];
+        //find the last param, normaly the last but we take no chance
+        if(idx[0].as<int>() > param_pos)
+        {
+            param_pos  = idx[0].as<int>();
+            param_size = idx[1].as<int>();
+        }
+    }
+    int nbByte = param_pos+param_size;
+    if((param_pos+param_size)%8) nbByte++;
+    return nbByte;
+}
+
 
 //------------------------------------------------------------------------------------------------------------
 String SmkList::isMacExist(uint32_t umac)

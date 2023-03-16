@@ -66,6 +66,12 @@ public:
 	static bool loadTypes(String json_string);
 
 	void assignTypeToNode();
+	int getNbBytePerLog(mesh_t::iterator  pNode);
+
+
+
+
+
 	static mesh_t::iterator find(uint32_t add)
 	{
 		for (auto x = pool.begin(); x != pool.end(); x++)
