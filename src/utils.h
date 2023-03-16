@@ -6,6 +6,7 @@
 #include <vector>
 #include <rom/rtc.h>
 #include <logger.h>
+#include <ArduinoJson.h>
 
 
 union value_converter_union

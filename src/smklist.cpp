@@ -450,16 +450,3 @@ String SmkList::macInt2String(uint32_t add)
     return String(a.bOff[3]) + "." + String(a.bOff[2]) + "." + String(a.bOff[1]) + "." + String(a.bOff[0]);
 }
 
-//------------------------------------------------------------------------------------------------------------
-int32_t SmkNode::getSetting(String name)
-{
-    int32_t ret = 0; //default
-    for(auto s:settings)
-    {
-        if(s.name==name){
-            ret = s.value;
-            break;
-        } 
-    }
-    return ret;
-}

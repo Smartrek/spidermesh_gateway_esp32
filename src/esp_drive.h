@@ -2,7 +2,6 @@
 #define ESP_DRIVE_H
 #include <Arduino.h>
 #include <SPIFFS.h>
-#include <smklist.h>
 #include <HardwareProfile.h>
 #include <vector>
 

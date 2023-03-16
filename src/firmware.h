@@ -51,6 +51,65 @@
 #define NB_PAGE_PER_BLOCK (SIZE_DATA_PER_BLOCK / SIZE_DATA_PER_PACKET)
 
 
+
+class FirmwareVersion
+{
+public:
+	uint8_t version;
+	uint16_t sub_version;
+	uint16_t database;
+	uint8_t serie;
+
+	FirmwareVersion()
+	{
+		version = 0;
+		sub_version = 0;
+		database = 0;
+		serie = 0;
+	};
+	void clear()
+	{
+		version = 0;
+		sub_version = 0;
+		database = 0;
+		serie = 0;
+	};
+	String getVersionString()
+	{
+		String ret = "";
+		if (version > 0 && sub_version > 0 && database > 0 && serie > 0)
+			ret = String(version) + "." + String(sub_version) + "." + String(database) + "." + String(serie);
+		return ret;
+	};
+};
+
+class FirmwareHost
+{
+public:
+	uint16_t version;
+	uint16_t sub_version;
+
+	FirmwareHost() { clear(); };
+	void clear()
+	{
+		version = 0;
+		sub_version = 0;
+	};
+	String getVersionString()
+	{
+		String ret = "";
+
+		// Serial.print("version:");
+		// Serial.print(version);
+		// Serial.print("   sub_version:");
+		// Serial.println(sub_version);
+		if (version > 0)
+			ret = String(version) + "." + String(sub_version);
+		return ret;
+	};
+};
+
+
 enum firmware_type_t
 {
     SMK900,
@@ -67,152 +126,6 @@ union uf2_block_t
 typedef std::pair<int32_t, uint16_t> missing_element_t;
 typedef std::list<missing_element_t> missing_list_t;
 
-class firmware_evm_t
-{
-public:
-    File bin;
-    String raw;
-
-    uint16_t crc_returned;
-    uint16_t crc_calculated;
-    String filename;
-
-    firmware_evm_t()
-    {
-        crc_returned = 0xFFFF;
-        crc_calculated = 0;
-    };
-
-    bool open(String fname = "")
-    {
-        bool ret = false;
-        if (fname == "")
-            fname = filename;
-        bin = SPIFFS.open(fname);
-        raw = "";
-
-        if (bin)
-        {
-            if (bin.size())
-            {
-                while (bin.available())
-                {
-                    raw += bin.read();
-                };
-                String mainEntry = raw.substring(raw.length() - 2);
-                String raw = raw.substring(0, raw.length() - 2);
-
-                uint16_t mEntry = mainEntry[1];
-                mEntry <<= 8;
-                mEntry += mainEntry[0];
-
-                Serial.printf("Main entry: %04X\n", mEntry);
-
-                crc_calculated = crc_compat_calculateCRC16Generic(raw, 0, 0x1021, 0, true);
-                bin.seek(0);
-                ret = true;
-            }
-        }
-        else
-        {
-            Serial.println("error bin file");
-        }
-        return ret;
-    };
-
-    apiframe readNextChunk(int front = -1, int len = 64)
-    {
-        apiframe ret;
-        int i = 0;
-        if (front > 0)
-            ret.push_back(front);
-        while (bin.available() && i < len)
-        {
-            ret.push_back(bin.read());
-            i++;
-        }
-        if (i % 2 == 0)
-            ret.push_back(0);
-        return ret;
-    };
-
-    int crc_compat_flipInt8(int poly)
-    {
-        int polyRev = 0;
-        for (int i = 0; i < 8; i++)
-        {
-            int iInv = 7 - i;
-            polyRev += (((poly >> iInv) & 0x01) << i);
-        }
-        return polyRev;
-    }
-
-    int crc_compat_flipInt16(int poly)
-    {
-        int polyRev = 0;
-        for (int i = 0; i < 16; i++)
-        {
-            int iInv = 15 - i;
-            polyRev += (((poly >> iInv) & 0x0001) << i);
-        }
-        return polyRev;
-    }
-
-    void crc_compat_flipBytes(unsigned char *bytes, int len)
-    {
-        if (bytes != 0)
-        {
-            for (int i = 0; i < len; i++)
-            {
-                bytes[i] = (unsigned char)crc_compat_flipInt8(((int)bytes[i]) & 0xFF);
-            }
-        }
-    }
-
-    String crc_compat_flipBytes(String in)
-    {
-        String ret;
-
-        for (size_t i = 0; i < in.length(); i++)
-        {
-            ret += crc_compat_flipInt8(((int)in[i]) & 0xFF);
-        }
-        return ret;
-    }
-
-    int crc_compat_calculateCRC16Generic(String bytesIn, int initial16, int polynomial16, int finalXor16, bool doFlip)
-    {
-        String bytes = bytesIn;
-
-        if (doFlip)
-        {
-            bytes = crc_compat_flipBytes(bytesIn);
-        }
-        int crc = initial16;
-        for (size_t k = 0; k < bytes.length(); k++)
-        {
-            int b = bytes[k];
-            for (int i = 0; i < 8; i++)
-            {
-                bool bit = ((b >> (7 - i) & 1) == 1);
-                bool c15 = ((crc >> 15 & 1) == 1);
-                crc <<= 1;
-                if (c15 ^ bit)
-                    crc ^= polynomial16;
-            }
-        }
-
-        crc ^= finalXor16;
-
-        crc &= 0xFFFF;
-
-        if (doFlip)
-        {
-            crc = crc_compat_flipInt16(crc);
-        }
-        return crc;
-    };
-};
 
 class firmware_t
 {
