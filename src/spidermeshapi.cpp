@@ -33,6 +33,7 @@ firmware_t SpidermeshApi::firmware;
 
 apiframe SpidermeshApi::current_packet;
 std::function<void(apiframe)> SpidermeshApi::cbWhenPacketReceived;
+std::function<void(apiframe)> SpidermeshApi::cbWhenPacketSent;
 std::function<bool(bool)> SpidermeshApi::WhenEobIsReceived;
 uint32_t SpidermeshApi::focus_node;
 unsigned long SpidermeshApi::focus_node_start_time;
@@ -93,6 +94,7 @@ SpidermeshApi::SpidermeshApi()
     idx_polling_cnt=0;
 
     cbWhenPacketReceived = [](apiframe){};
+    //cbWhenPacketSent = [](apiframe){};
 
     mutexExpect = portMUX_INITIALIZER_UNLOCKED;
 }
@@ -128,7 +130,7 @@ bool SpidermeshApi::init()
 
     smkport.begin(PORTIA_BAUDRATE, SERIAL_8N1, RX_PORTIA, TX_PORTIA);
     pinMatrixInAttach(33, 199, false);
-    smkport.setPins(RX_PORTIA,TX_PORTIA,CTS_PORTIA, -1);
+    smkport.setPins(RX_PORTIA,TX_PORTIA, -1, CTS_PORTIA);
     smkport.setHwFlowCtrlMode(HW_FLOWCTRL_CTS);
 
 
@@ -337,7 +339,7 @@ bool SpidermeshApi::parseReceivedData()
 
 
                     timeCallbackUser = millis();
-                    cbWhenPacketReceived(current_packet); //for user purpose
+                    if(cbWhenPacketReceived) cbWhenPacketReceived(current_packet); //for user purpose
                     timeCallbackUser = millis() - timeCallbackUser; 
 
                     //IS EOB
@@ -525,6 +527,7 @@ String SpidermeshApi::sendCommand(apiframe cmd)
     for (int i = 0; i < cmd.size(); i++){
         write(cmd[i]);
     }
+    if(cbWhenPacketSent)cbWhenPacketSent(cmd);
 
 
     String cmd_out = hexPacketToAscii(cmd);
@@ -586,6 +589,8 @@ bool SpidermeshApi::sendNextPacketBuffered()
             byte pType = (req.payload[3]!=PACKET_TXAIR_CMD_WRAPPER) ? req.payload[3] : req.payload[5];
             WriteAndExpectAnwser(req.pNode, req.payload, pType, req.tag, req.callback);
         }
+
+
 
         if(show_apipkt_out)
         {
