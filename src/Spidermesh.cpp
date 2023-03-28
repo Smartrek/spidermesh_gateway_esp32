@@ -1503,7 +1503,7 @@ bool Spidermesh::ProcessState(bool eob)
 			setState(GETMISSINGFLAGS_INIT);
 		firmware.current_progress++;
 	#else
-		if (eob)
+		if (eob || pCurrentNode->second.local)
 		{
 			firmware.readNextBlock(); // read block if needed (4 chunk per block)
 			int nb_to_send = firmware.checkNextChunk();
@@ -1532,12 +1532,6 @@ bool Spidermesh::ProcessState(bool eob)
 				apiframe cmd = apiPacket(SMK_UPDATE_OTA_CMD, pkt, pCurrentNode->second.local, true);
 
 				firmware.start_page += NB_PAGE_PER_DATA_PACKET;
-				/*
-				for (int i = 0; i < SIZE_DATA_PER_PACKET; i++)
-				{
-					// write(firmware.getChunkByte());
-					x.push_back(firmware.getChunkByte());
-				}*/
 
 	#if SIM_SKIP_SOME_BROADCAST_UPLOAD
 				if (sim_skip_first_packet++ > SIM_SKIP_SOME_BROADCAST_UPLOAD_EVERY)
@@ -1548,11 +1542,34 @@ bool Spidermesh::ProcessState(bool eob)
 				else
 					write(cmd);
 	#else
-				write(cmd);
+				if(!pCurrentNode->second.local)	write(cmd); //since in remote, we broadcast, we don't expect anwser
+				else 
+				{
+					WriteAndExpectAnwser(pCurrentNode, cmd, SMK_UPDATE_OTA_CMD, "bulkupload",
+					ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
+					{
+						//TIMEOUT
+						if(!success) {
+							pNode->second.otaStep = STEP_FAILED;
+							PRTF("  Unable to upload to %s\n", pNode->second.getMacAsString()); 
+							return; 
+						}
+
+						resetOtaTimeout();
+						//SUCESS
+						if(firmware.isEndCondition()) 
+						{
+							setState(GETMISSINGFLAGS_INIT);
+						}
+						else setState(BULKUPLOAD);
+						
+					}));
+					setState(WAIT);
+				}
+
+
 	#endif
-
 				resetOtaTimeout();
-
 
 				firmware.current_progress++;
 				ret = true;
