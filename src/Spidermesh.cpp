@@ -593,15 +593,18 @@ bool Spidermesh::ProcessState(bool eob)
 		// set gateway mac as unavailable
 		gatewayMacAddressIsReceived = false;
 
-		// void (*cc)(const mesh_t::iterator pNode, bool success);
-		// https://www.learncpp.com/cpp-tutorial/lambda-captures/
-
-		setOtaTimeout(60000);
-		apiframe cmd1 = apiPacket(SMK_WRITE_REG, {0x00, 17, 0x01, 0x01}, LOCAL);
 
 		//mesh_t gateway_boot;
 		SmkNode g;
 		gateway_boot.insert(std::make_pair(0,g));
+
+
+		setOtaTimeout(60000);
+
+		setState(WAIT);
+
+		apiframe cmd1 = apiPacket(SMK_WRITE_REG, {0x00, 17, 0x01, 0x01}, LOCAL);
+
 
 		WriteAndExpectAnwser(gateway_boot.begin(), cmd1, 0x14, 6, "init", ExpectCallback([](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
 																			{
@@ -611,76 +614,118 @@ bool Spidermesh::ProcessState(bool eob)
             Serial.println("  EOB flag enabled");
 			#endif
 
-            //uint8_t uart_setting[10] = {0x0E, 0,0,0,0,0,100,0};
-            //apiframe cmd2 = localSetRegister(34,8,uart_setting); //Enable sleep for the gateway in order to fix esd bug...
-			apiframe cmd2 = apiPacket(SMK_WRITE_REG, {0x00, 34, 0x08, 0x0E, 0,0,0,0,0,100,0}, LOCAL);
 
-            WriteAndExpectAnwser(gateway_boot.begin(), cmd2,0x14,  "init", ExpectCallback([](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void {
-                if(!success) { return; }
-				#if SHOW_SMK900_INIT
-                Serial.println(pNode->second.name + "  Gateway sleep mode enabled");
-				#endif
-				//log[String(millis())] = "EOB written";
-            
-                //apiframe cmd3 = localTransfertConfigFromRAMBUFF(1); //transfert it to RAM to enable config sent
-				//    uint8_t cmd[5] = {0xFB, 2, 0, 0x0B, location};
-				apiframe cmd3 = apiPacket(SMK_TRANSFERT_MEM, {0x01}, LOCAL);
-                WriteAndExpectAnwser(gateway_boot.begin(), cmd3, 0x1B,  "init", ExpectCallback([](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void {
-                    if(!success) { Serial.println(" Node " + pNode->second.name + " is unavailable."); return; }
-						#if SHOW_SMK900_INIT
-                        	Serial.println(pNode->second.name + "  Transfert to RAM");
-						#endif
-
-                        //apiframe cmd5 = requestMacAddress();
-						//uint8_t cmd[20] = {0xFB, 4, 0, 3, 2,0,8};
-						apiframe cmd5 = apiPacket(SMK_READ_REG, {0x00, 0x00, 0x08}, LOCAL);
-					
-					WriteAndExpectAnwser(gateway_boot.begin(), cmd5, 0x13,  "init", ExpectCallback([](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void {
-						if(!success) { Serial.println(" Node " +   pNode->second.name + " is unavailable."); return; }
-						
-						SaveGatewayMacAddress(packet);
-						IPAddress RepliedMacAddress = {packet[10], packet[9], packet[8], packet[7]}; 
-						String smac =RepliedMacAddress.toString();
-						uint32_t a = SmkList::macString2Umac(smac);
-
-						if(!initDoneOnce)
-						{
-							//Creation of the gateway node
-							DynamicJsonDocument gateway_json(200);
-							gateway_json.createNestedObject(smac);
-							gateway_json[smac]["name"]="main";
-							gateway_json[smac]["type"]="gateway";
-							gateway_json[smac]["local"]=true;
-							gateway_json[smac]["srate"]=-1;
-							//for loop as a work around to get a JsonPair
-							for(auto jp:gateway_json.as<JsonObject>()) gateway = nodes.addNode(jp);
-							gateway->second.pjson_type = nodes.type_json["gateway"].as<JsonVariant>();
-							
-							if(cbLoadExternalParamFiles){
-								cbLoadExternalParamFiles();
-								dumpReceivedBuffer();
-							} 
-							else{
-								nodes.loadParamFiles();
-							} 
-							PRT("GATEWAY mac is: ");
-							PRTLN(smac);
-
-						}
-						SpidermeshApi::findNext(true,true);
-						//auto g = gateway;
-
-						if(initDoneOnce) setState(READ_GW_FIRMWARE);
-						else             setState(GET_NODE_TYPE);
-
-						initDoneOnce = true;
-						
-					}));
-                }));
-            })); 
+			setState(INIT_GATEWAY_SLEEP_EN);
 		}));
 
 		ret = true;
+	}
+	
+	else if (isState(INIT_GATEWAY_SLEEP_EN))
+	{
+		PRTLN("\n--> INIT_GATEWAY_SLEEP_EN");
+		setState(WAIT);
+		apiframe cmd = apiPacket(SMK_WRITE_REG, {0, 7, 1, 0}, LOCAL);
+		WriteAndExpectAnwser(gateway_boot.begin(), cmd, SMK_WRITE_REG, "settype1", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void 
+		{
+			#if SHOW_SMK900_INIT
+			Serial.println(pNode->second.name + "  Gateway sleep mode enabled");
+			#endif
+
+			setState(GATEWAY_TRANSFERT_TO_RAM);
+
+		}));
+	}
+	
+	else if (isState(GATEWAY_TRANSFERT_TO_RAM))
+	{
+		PRTLN("\n--> GATEWAY_TRANSFERT_TO_RAM");
+		setState(WAIT);
+		apiframe cmd3 = apiPacket(SMK_TRANSFERT_MEM, {0x01}, LOCAL);
+		WriteAndExpectAnwser(gateway_boot.begin(), cmd3, 0x1B,  "init", ExpectCallback([](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void {
+			if(!success) { Serial.println(" Node " + pNode->second.name + " is unavailable."); return; }
+
+
+			#if SHOW_SMK900_INIT
+				Serial.println(pNode->second.name + "  Transfert to RAM");
+			#endif
+			setState(GATEWAY_READ_MAC);
+		}));
+
+	}
+	else if (isState(GATEWAY_TRANSFERT_TO_EEPROM))
+	{
+		PRTLN("\n--> GATEWAY_TRANSFERT_TO_EEPROM");
+		setState(WAIT);
+		apiframe cmd3 = apiPacket(SMK_TRANSFERT_MEM, {0x02}, LOCAL);
+		WriteAndExpectAnwser(gateway_boot.begin(), cmd3, 0x1B,  "init", ExpectCallback([](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void {
+			if(!success) { Serial.println(" Node " + pNode->second.name + " is unavailable."); return; }
+
+
+			#if SHOW_SMK900_INIT
+				Serial.println(pNode->second.name + "  Transfert to EEPROM");
+			#endif
+			setState(RESET,next_state);
+		}));
+
+	}
+	
+	else if (isState(GATEWAY_READ_MAC))
+	{
+		PRTLN("\n--> GATEWAY_READ_MAC");
+		setState(WAIT);
+
+		//apiframe cmd5 = requestMacAddress();
+		//uint8_t cmd[20] = {0xFB, 4, 0, 3, 2,0,8};
+		apiframe cmd5 = apiPacket(SMK_READ_REG, {0x00, 0x00, 0x08}, LOCAL);
+		
+		WriteAndExpectAnwser(gateway_boot.begin(), cmd5, 0x13,  "init", ExpectCallback([](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void {
+			if(!success) { Serial.println(" Node " +   pNode->second.name + " is unavailable."); return; }
+			
+			//SaveGatewayMacAddress(packet);
+			IPAddress RepliedMacAddress = {packet[10], packet[9], packet[8], packet[7]}; 
+			String smac =RepliedMacAddress.toString();
+			uint32_t a = SmkList::macString2Umac(smac);
+
+			if(!initDoneOnce)
+			{
+				//Creation of the gateway node
+				DynamicJsonDocument gateway_json(200);
+				gateway_json.createNestedObject(smac);
+				gateway_json[smac]["name"]="main";
+				gateway_json[smac]["type"]="gateway";
+				gateway_json[smac]["local"]=true;
+				gateway_json[smac]["srate"]=-1;
+				//for loop as a work around to get a JsonPair
+				for(auto jp:gateway_json.as<JsonObject>()) gateway = nodes.addNode(jp);
+				gateway->second.pjson_type = nodes.type_json["gateway"].as<JsonVariant>();
+
+
+				PRT("GATEWAY mac is: ");
+				PRTLN(smac);
+
+			}
+			SpidermeshApi::findNext(true,true);
+
+			if(initDoneOnce) setState(READ_GW_FIRMWARE);
+			else             setState(LOAD_MESH);
+
+			initDoneOnce = true;
+			
+		}));
+
+
+	}
+	else if(isState(LOAD_MESH))
+	{
+		if(cbLoadExternalParamFiles){
+			cbLoadExternalParamFiles();
+			dumpReceivedBuffer(); //because previous callback is allowed to take a longer time
+		} 
+		else{
+			nodes.loadParamFiles();
+		} 
+		setState(GET_NODE_TYPE);
 	}
 	else if (isState(GET_NODE_TYPE))
 	{
@@ -707,19 +752,12 @@ bool Spidermesh::ProcessState(bool eob)
 		{
 			if(!success) { PRTLN("  Unable to set node as gateway"); return; }
 			PRTLN("\n--> SAVE TO EEPROM");
-			setState(WAIT);
-			apiframe cmd = apiPacket(SMK_TRANSFERT_MEM, {2}, LOCAL);
-			WriteAndExpectAnwser(gateway, cmd, SMK_TRANSFERT_MEM, "settype2", ExpectCallback([&](mesh_t::iterator pNode, apiframe packet, bool success, String tag) ->void 
-			{
-				if(!success) { PRTLN("  Unable to save to EEPROM"); return; }
-				setState(RESET,READ_GW_FIRMWARE);
-				PRTLN("  SAVE to EEPROM sucess");
-				log[String(millis())] = "SAVE to EEPROM";
-				setOtaTimeout(300000);
-			}));
-			resetOtaTimeout();
+			setState(GATEWAY_TRANSFERT_TO_EEPROM,READ_GW_FIRMWARE);
+			delay(10);
 		}));
 	}
+
+
 	else if (isState(READ_GW_FIRMWARE))
 	{
 		PRTLN("\n--> READ_GW_FIRMWARE");

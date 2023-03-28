@@ -188,7 +188,7 @@ public:
 class SpidermeshApi
 {
 
-private:
+protected:
 	static unsigned char state_serial;
 
 	static apiframe current_packet;

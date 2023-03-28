@@ -79,7 +79,12 @@ enum ota_state
 	CHECK_FILE_AND_LOAD_IF_AVAILABLE, /* calc length*/
 
 	/* Depending of the mode, it can go elswhere at the end of this sequence  */
-	INIT_GATEWAY_REGISTER,	  /* 1 EOB                   0  */
+	INIT_GATEWAY_REGISTER,
+	INIT_GATEWAY_SLEEP_EN,
+	GATEWAY_TRANSFERT_TO_RAM,
+	GATEWAY_TRANSFERT_TO_EEPROM,
+	GATEWAY_READ_MAC,
+	LOAD_MESH,
 	GET_NODE_TYPE,
 	SET_NODE_TYPE,
 	READ_GW_FIRMWARE,
