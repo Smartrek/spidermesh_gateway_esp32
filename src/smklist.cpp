@@ -396,11 +396,11 @@ void SmkList::assignTypeToNode()
     }  
 }
 //------------------------------------------------------------------------------------------------------------
-int SmkList::getNbBytePerLog(mesh_t::iterator  pNode)
+int SmkList::getNbBytePacket(mesh_t::iterator  pNode, String tag)
 {
     int param_pos=0;
     int param_size=0;
-    for(auto p:type_json[pNode->second.type]["status"]["params"].as<JsonObject>())
+    for(auto p:type_json[pNode->second.type][tag]["params"].as<JsonObject>())
     {
         auto idx = p.value().as<JsonObject>()["pos"];
         //find the last param, normaly the last but we take no chance

@@ -66,7 +66,7 @@ public:
 	static bool loadTypes(String json_string);
 
 	void assignTypeToNode();
-	int getNbBytePerLog(mesh_t::iterator  pNode);
+	int getNbBytePacket(mesh_t::iterator  pNode, String tag="status");
 
 
 
