@@ -17,17 +17,17 @@
         "settings":{"offset":{"value":40}},
         "priority":1
     },
-    "0.0.234.186": {
+    "0.1.234.186": {
         "name": "Repeater 1",
         "type": "repeater",
         "settings":{"offset":{"value":60}}
     },           
-    "0.0.234.192": {
+    "0.1.234.192": {
         "name": "Repeater 2",
         "type": "repeater",
         "settings":{"offset":{"value":70}}
     },           
-    "0.0.234.195": {
+    "0.1.234.195": {
         "name": "Repeater 3",
         "type": "repeater",
         "settings":{"offset":{"value":80}}

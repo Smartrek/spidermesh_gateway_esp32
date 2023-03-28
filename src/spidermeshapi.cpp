@@ -802,10 +802,14 @@ void SpidermeshApi::CheckIfAnswerWasExpectedAndCallSuccessFunction(apiframe rxPk
                 Serial.println("  = remote packet match");
               #endif
 
+
+                int len = nodes.getNbBytePacket(i->_pNode,i->_tag);
+
+
+
+
                 //PRTLN("PACKET REMOTE RESP");
                 u_mac add_rx;
-
-
                 add_rx.bOff[byte0]=rxPkt[7];
                 add_rx.bOff[byte1]=rxPkt[8];
                 add_rx.bOff[byte2]=rxPkt[9];
@@ -816,16 +820,30 @@ void SpidermeshApi::CheckIfAnswerWasExpectedAndCallSuccessFunction(apiframe rxPk
                 
                 if(add_rx.address== i->_pNode->second.mac.address)
                 {
-                  #if SHOW_EXPECT_EVENT
-                    Serial.println(" == expect match found");
-                  #endif
-                    i->_expect_callback(i->_pNode, rxPkt, true, i->_tag);
-                    i->_pNode->second.dataValid = 1;
-                  #if SHOW_EXPECT_EVENT
-                    Serial.println("  data validity TRUE  <----------" + i->_pNode->second.name);
-                  #endif
-                    i=listOfExpectedAnswer.erase(i);
-                    break;
+                    //Serial.printf("%s %s == %s %s\n",KGRN,macIntToString(add_rx.address).c_str(), i->_pNode->second.getMacAsString(), KNRM);
+                    //Serial.printf("%srxPkt.size()-10 %d==%d len%s\n",KGRN,rxPkt.size()-10, len,KNRM);
+                    if(rxPkt.size()-10 == len)
+                    {
+                        Serial.printf("%sSUCCES %s\n",KCYN, i->_pNode->second.getMacAsString());
+                    #if SHOW_EXPECT_EVENT
+                        Serial.println(" == expect match found");
+                    #endif
+                        i->_expect_callback(i->_pNode, rxPkt, true, i->_tag);
+                        i->_pNode->second.dataValid = 1;
+                    #if SHOW_EXPECT_EVENT
+                        Serial.println("  data validity TRUE  <----------" + i->_pNode->second.name);
+                    #endif
+                        i=listOfExpectedAnswer.erase(i);
+                        break;
+                    }
+                    //if mac is same, but packet isn't define, it must be a special request from user
+                    else if(len == -1 )
+                    {
+                        i->_expect_callback(i->_pNode, rxPkt, true, i->_tag);
+                        i=listOfExpectedAnswer.erase(i);
+                        break;
+                    }
+                    
                 }
             }
 

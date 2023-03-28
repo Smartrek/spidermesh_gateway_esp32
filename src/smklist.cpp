@@ -400,7 +400,10 @@ int SmkList::getNbBytePacket(mesh_t::iterator  pNode, String tag)
 {
     int param_pos=0;
     int param_size=0;
-    for(auto p:type_json[pNode->second.type][tag]["params"].as<JsonObject>())
+
+    //Serial.printf("%s  %s  %s  ",KYEL,pNode->second.type,tag);
+    if(!type_json[pNode->second.type]["parser"].containsKey(tag)) return -1;
+    for(auto p:type_json[pNode->second.type]["parser"][tag]["params"].as<JsonObject>())
     {
         auto idx = p.value().as<JsonObject>()["pos"];
         //find the last param, normaly the last but we take no chance
@@ -410,8 +413,11 @@ int SmkList::getNbBytePacket(mesh_t::iterator  pNode, String tag)
             param_size = idx[1].as<int>();
         }
     }
+    
     int nbByte = param_pos+param_size;
     if((param_pos+param_size)%8) nbByte++;
+    nbByte/=8;
+    //Serial.printf("%s  %d\n",KYEL,nbByte);
     return nbByte;
 }
 

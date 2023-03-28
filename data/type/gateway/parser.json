@@ -1,5 +1,5 @@
 { 
     "name":"Gateway",
     "code":1,
-    "parser":{}
+    "parser":{"status":{"params":{}}}
 }
