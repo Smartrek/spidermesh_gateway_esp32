@@ -248,7 +248,7 @@ String readNodeListFile()
 //------------------------------------------------------------------------------
 bool writeDirectlyToFile(char *name, String content)
 {
-    if (getConditionDrive())
+    if (!getConditionDrive())
     {
         Serial.println("Error system not ready to write");
         return false;
