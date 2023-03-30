@@ -1015,7 +1015,7 @@ void SpidermeshApi::automaticNodePolling()
                         noToPollFound = true;
                         #if SHOW_AUTOMATIC_POLLING
                             Serial.print(KYEL);
-                            Serial.println"Normal priority polling");
+                            Serial.println("Normal priority polling");
                             Serial.print(KNRM);
                         #endif   
                         break;
