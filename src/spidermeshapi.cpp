@@ -820,7 +820,6 @@ void SpidermeshApi::CheckIfAnswerWasExpectedAndCallSuccessFunction(apiframe rxPk
                     //Serial.printf("%srxPkt.size()-10 %d==%d len%s\n",KGRN,rxPkt.size()-10, len,KNRM);
                     if(rxPkt.size()-10 == len)
                     {
-                        Serial.printf("%sSUCCES %s\n",KCYN, i->_pNode->second.getMacAsString());
                     #if SHOW_EXPECT_EVENT
                         Serial.println(" == expect match found");
                     #endif
