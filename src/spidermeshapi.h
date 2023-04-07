@@ -142,7 +142,6 @@ class ExpectAnswer
 {
 public:
 	mesh_t::iterator _pNode;
-	uint8_t _packet_type;
 	bool _local;
 	uint8_t _eob_cnt;
 	int16_t _size;
@@ -153,14 +152,13 @@ public:
 	String _tag;
 
 	ExpectAnswer(){};
-	ExpectAnswer(mesh_t::iterator pNode, uint8_t packet_type, apiframe request, ExpectCallback expect_callback, String tag = "", uint8_t max_retry = 0, apiframe expectPayload = {}, int16_t size = -1)
+	ExpectAnswer(mesh_t::iterator pNode, apiframe request, ExpectCallback expect_callback, String tag = "", uint8_t max_retry = 0, apiframe expectPayload = {}, int16_t size = -1)
 	{
-		init(pNode, packet_type, request, expect_callback, tag, expectPayload, size);
+		init(pNode, request, expect_callback, tag, expectPayload, size);
 	};
-	void init(mesh_t::iterator pNode, uint8_t packet_type, apiframe request, ExpectCallback expect_callback, String tag = "", apiframe expectPayload = {}, int16_t size = -1)
+	void init(mesh_t::iterator pNode, apiframe request, ExpectCallback expect_callback, String tag = "", apiframe expectPayload = {}, int16_t size = -1)
 	{
 		_pNode = pNode;
-		_packet_type = packet_type;
 		_eob_cnt = 0;
 
 		_expect_callback = expect_callback;
@@ -204,7 +202,8 @@ protected:
 
 private:
 	static void OptimalDelay();
-	static uint64_t timeCallbackUser;   
+	static uint64_t timeCallbackUser; 
+	static bool special_op_done;
 
 public:
 	static ExpectCallback cbAutomaticPolling;
@@ -372,7 +371,7 @@ private:
 public:
 	static void initWatchdogParser();
 	static void disableWatchdogParser();
-	static bool sendNextPacketBuffered();
+	static bool sendNextPacketBuffered(bool eob);
 	static bool parseCompletePacket();
 
 	static void resetDataSensorValue(uint8_t idx);
@@ -412,7 +411,7 @@ protected:
 	static commandList_t highPriorityFifoCommandList;
 
 	static bool isMessageStackEmpty() { return !(lowPriorityFifoCommandList.size() + highPriorityFifoCommandList.size()); };
-	static apiframe checkNextPacketToSend() { return lowPriorityFifoCommandList.front(); };
+	static apiframe checkNextPacketToSend();
 
 public:
 	static void ClearFifoAndExpectList();
@@ -422,7 +421,6 @@ public:
 	static bool addApiPacketLowPriority(uint8_t *buffer, int size);
 	static bool addApiPacketHighPriority(apiframe hcmd);
 
-	static bool addWriteExpect(MeshRequest_t r);
 	static bool addWriteExpect(mesh_t::iterator p, apiframe h, String t, ExpectCallback cb);
 
 	//------------------------------------------------
@@ -430,16 +428,16 @@ public:
 	static std::list<ExpectAnswer> listOfExpectedAnswer;
 
 	static void WriteAndExpectAnwser(
-		mesh_t::iterator pNode, apiframe request, uint8_t packet_type,
+		mesh_t::iterator pNode, apiframe request,
 		uint8_t max_retry = 0, apiframe expectPayload = {}, int16_t size = -1, String tag="", 
 		ExpectCallback cb = [](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void {});
 
 	static void WriteAndExpectAnwser(
-		mesh_t::iterator pNode, apiframe request, uint8_t packet_type, String tag="",
+		mesh_t::iterator pNode, apiframe request, String tag="",
 		ExpectCallback cb = [](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void {});
 
 	static void WriteAndExpectAnwser(
-		mesh_t::iterator pNode, apiframe request, uint8_t packet_type, uint8_t max_retry, String tag="",
+		mesh_t::iterator pNode, apiframe request, uint8_t max_retry, String tag="",
 		ExpectCallback cb = [](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void {});
 
 	static void CheckIfAnswerWasExpectedAndCallSuccessFunction(apiframe rxPkt);

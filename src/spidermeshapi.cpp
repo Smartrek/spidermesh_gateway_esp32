@@ -40,6 +40,8 @@ uint32_t SpidermeshApi::focus_node;
 unsigned long SpidermeshApi::focus_node_start_time;
 uint16_t SpidermeshApi::_duration_focus_on_node_polling;
 
+bool SpidermeshApi::special_op_done = false;
+
 
 //std::vector <mesh_t::iterator> SpidermeshApi::otaList;
 
@@ -94,9 +96,6 @@ SpidermeshApi::SpidermeshApi()
 
     length_packet = 0;
     idx_polling_cnt=0;
-
-    cbWhenPacketReceived = [](apiframe){};
-    //cbWhenPacketSent = [](apiframe){};
 
     mutexExpect = portMUX_INITIALIZER_UNLOCKED;
     enable_terminal_record = false;
@@ -352,7 +351,12 @@ bool SpidermeshApi::parseReceivedData()
                         CheckExpectTimeout();
                         WhenEobIsReceived(true);
                     }
-                    if(iseob) OptimalDelay();                 //delay for other thread
+                    /*
+                    if(iseob) {
+                        OptimalDelay();                 //delay for other thread
+                        special_op_done = false;
+                    }
+                    */
 
                     if(enable_terminal_record) AddToTerminalBuffer("in :", &current_packet);
 
@@ -385,12 +389,21 @@ bool SpidermeshApi::parseReceivedData()
     }
     return ret;
 }
+apiframe SpidermeshApi::checkNextPacketToSend() {
 
+
+
+    
+    
+    
+    return {};//if(lowPriorityFifoCommandList.size())lowPriorityFifoCommandList.front(); 
+    
+};
 
 //------------------------------------------------------------------------------------------------
 void SpidermeshApi::OptimalDelay()
 {
-    if(actualMeshSpeed.hop != 0)
+    if(actualMeshSpeed.hop != 0 && isMessageStackEmpty())
     {
 
         int tBroadcast;
@@ -407,7 +420,6 @@ void SpidermeshApi::OptimalDelay()
         if(secureSleep >60000) secureSleep = 60000;
 
         #if 0
-            /*
             char msg[100];
             sprintf(msg, "Bo:%d\nBi:%d\nHops:%d\nR:%d\nRe:%d\nDuty:%d\n",actualMeshSpeed.bo,actualMeshSpeed.bi,actualMeshSpeed.hop,actualMeshSpeed.rde,actualMeshSpeed.rd,actualMeshSpeed.duty);
             Serial.print(msg);
@@ -417,7 +429,9 @@ void SpidermeshApi::OptimalDelay()
             Serial.print("tInterval:");
             Serial.println(tInterval);
             Serial.print("tSleep:");
-            Serial.println(tSleep);*/
+            Serial.println(tSleep);
+        #endif
+        #if 1
             Serial.print("  secureSleep:");
             Serial.println(secureSleep);
             Serial.print("  timeCallbackUser:");
@@ -430,15 +444,14 @@ void SpidermeshApi::OptimalDelay()
         {
             delay(100);
             remaining -=100;
-            if(smkport.available()) break;
+            int av = smkport.available();
+            if(av) 
+            {
+                Serial.printf("nb av:%d\n", av);
+                break;    
+            }
         } while (remaining>0);
     }
-    else
-    {
-        delay(100);
-    }
-    
-
 }
 
 //------------------------------------------------------------------------------------------------
@@ -551,15 +564,16 @@ void SpidermeshApi::AddToTerminalBuffer(String head, apiframe *cmd)
 
 }
 
-//------------------------------------------------------------------------------------------------
-// This function will poll the next on demand command
-// It is taking the place of the normal base polling list
-// It should be send after receiving an end of broadcast marker
-//
-bool SpidermeshApi::sendNextPacketBuffered()
+bool SpidermeshApi::sendNextPacketBuffered(bool eob)
 {
-    bool ret = false;
-    taskENTER_CRITICAL(&mutexExpect);
+    bool remote_op_done = false;
+    bool appreq = false;
+
+    //check if there is already an app request here, if so, we don't want send anything else
+    //taskENTER_CRITICAL(&mutexExpect);
+    for(auto e:listOfExpectedAnswer) if(e._tag == "appreq") return true;
+    //taskEXIT_CRITICAL(&mutexExpect);
+
     if (writeAndExpectList.size()>0 || lowPriorityFifoCommandList.size() > 0 || highPriorityFifoCommandList.size() > 0)
     {
         //send the command
@@ -567,42 +581,59 @@ bool SpidermeshApi::sendNextPacketBuffered()
         Serial.print("on demand cmd sent: ");
     #endif
         apiframe cmd;
-        if(highPriorityFifoCommandList.size() > 0)
+        if(writeAndExpectList.size()>0)
+        {
+            auto x = writeAndExpectList.begin();
+            while(x != writeAndExpectList.end())
+            {
+                if(x->tag == "appreq") break;
+                x++;
+            }
+
+            if(x == writeAndExpectList.end()) x = writeAndExpectList.begin();
+
+            if(x->payload[3]==PACKET_TXAIR_CMD_WRAPPER) 
+            {
+                if(eob)
+                {
+                    cmd = x->payload;
+                    remote_op_done = true;
+                    WriteAndExpectAnwser(x->pNode, x->payload, x->tag, x->callback);
+                    writeAndExpectList.erase(x);
+                }
+                
+            }
+            else{
+                cmd = x->payload;
+                WriteAndExpectAnwser(x->pNode, x->payload, x->tag, x->callback);
+                writeAndExpectList.erase(x);
+            }
+        }
+        else if(highPriorityFifoCommandList.size() > 0)
         {
             cmd = highPriorityFifoCommandList.front();
-            highPriorityFifoCommandList.pop_front();
+            if(cmd[3]==PACKET_TXAIR_CMD_WRAPPER)
+                highPriorityFifoCommandList.pop_front();
             sendCommand(cmd);
         }
         else if(lowPriorityFifoCommandList.size() > 0)
         {
             cmd = lowPriorityFifoCommandList.front();
+            if(cmd[3]==PACKET_TXAIR_CMD_WRAPPER) remote_op_done = true;
             lowPriorityFifoCommandList.pop_front();
             sendCommand(cmd);
         }
-        else if(writeAndExpectList.size()>0)
-        {
-            //Serial.printf("writeAndExpectList.size():%d\r\n",writeAndExpectList.size());
-            MeshRequest_t req = writeAndExpectList.front();
-            writeAndExpectList.pop_front();
-            cmd = req.payload;
-            byte pType = (req.payload[3]!=PACKET_TXAIR_CMD_WRAPPER) ? req.payload[3] : req.payload[5];
-            WriteAndExpectAnwser(req.pNode, req.payload, pType, req.tag, req.callback);
-        }
-
-
 
         if(show_apipkt_out)
         {
             String prefix = "  out: ";
-            if(cmd[5] == 0x4E) prefix = "  broadcast: ";
+            if(cmd.size()>5)if(cmd[5] == 0x4E) prefix = "  broadcast: ";
             printApiPacket(cmd, prefix);
         }
-
-        ret = true;
     }
-    taskEXIT_CRITICAL(&mutexExpect);
+    
 
-    return ret;
+    return remote_op_done;
 }
 
 void SpidermeshApi::ClearFifoAndExpectList()
@@ -615,18 +646,14 @@ void SpidermeshApi::ClearFifoAndExpectList()
     dumpReceivedBuffer();
 }
 
-bool SpidermeshApi::addWriteExpect(MeshRequest_t r)
-{
-    taskENTER_CRITICAL(&mutexExpect);
-    writeAndExpectList.push_back(r);
-    taskEXIT_CRITICAL(&mutexExpect);
-    return true;
-}
+
 
 bool SpidermeshApi::addWriteExpect(mesh_t::iterator p, apiframe h, String t, ExpectCallback cb)
 {
     MeshRequest_t req = {p, h, cb, t};
-    addWriteExpect(req);
+    taskENTER_CRITICAL(&mutexExpect);
+    writeAndExpectList.push_back(req);
+    taskEXIT_CRITICAL(&mutexExpect);
     return true;
 }
 
@@ -701,25 +728,24 @@ bool SpidermeshApi::addApiPacketHighPriority(apiframe hcmd)
 
 
 
-void SpidermeshApi::WriteAndExpectAnwser(mesh_t::iterator pNode, apiframe request, uint8_t packet_type, String tag, ExpectCallback cb)
+void SpidermeshApi::WriteAndExpectAnwser(mesh_t::iterator pNode, apiframe request, String tag, ExpectCallback cb)
 {
     uint max_retry = DEFAULT_MAX_TRY_TO_SEND;
     apiframe expectPayload;
     int16_t size = -1;
 
-    WriteAndExpectAnwser(pNode,request,packet_type,max_retry,expectPayload, size, tag, cb);
+    WriteAndExpectAnwser(pNode,request,max_retry,expectPayload, size, tag, cb);
 }
-void SpidermeshApi::WriteAndExpectAnwser(mesh_t::iterator pNode, apiframe request, uint8_t packet_type, uint8_t max_retry, String tag,ExpectCallback cb)
+void SpidermeshApi::WriteAndExpectAnwser(mesh_t::iterator pNode, apiframe request, uint8_t max_retry, String tag,ExpectCallback cb)
 {
     apiframe expectPayload;
     int16_t size = -1;
 
-    WriteAndExpectAnwser(pNode,request,packet_type,max_retry,expectPayload, size, tag, cb);
+    WriteAndExpectAnwser(pNode,request,max_retry,expectPayload, size, tag, cb);
 }
 
 void SpidermeshApi::WriteAndExpectAnwser(  mesh_t::iterator pNode, 
-                                    apiframe request, 
-                                    uint8_t packet_type,                                      
+                                    apiframe request,                                   
                                     uint8_t max_retry, 
                                     apiframe expectPayload, 
                                     int16_t size, 
@@ -734,17 +760,21 @@ void SpidermeshApi::WriteAndExpectAnwser(  mesh_t::iterator pNode,
     bool found = false;
     for (auto i:listOfExpectedAnswer)
     {
-        if ( i._pNode == pNode && i._request == request) found = true;
+        if ( i._pNode == pNode && i._request == request){
+            found = true;
+            printf("%sFOUND%s", KRED, KNRM);
+            break;
+        } 
     }
 
     #define MAX_EXPECT_LIST 10
-    if(!found)
+    if(1)//!found)
     {
         if(listOfExpectedAnswer.size() < MAX_EXPECT_LIST)
         {
 
 
-            ExpectAnswer toWaitAnswerElem(pNode, packet_type, request, cb, tag, max_retry, expectPayload, size);
+            ExpectAnswer toWaitAnswerElem(pNode, request, cb, tag, max_retry, expectPayload, size);
             listOfExpectedAnswer.push_back(toWaitAnswerElem);
             sendCommand(request);
         }
@@ -793,8 +823,8 @@ void SpidermeshApi::CheckIfAnswerWasExpectedAndCallSuccessFunction(apiframe rxPk
                     break;
                 }
             }
+
             //since it is remote check the remote packet type futher
-            
             else if((expectRqType | 0x10) == (rxPkt[6] & 0x7F))
             {
               #if SHOW_EXPECT_EVENT
@@ -1075,12 +1105,20 @@ void SpidermeshApi::automaticNodePolling()
                 rqt_status.push_back(nodes.getTypeJsonVariant()[t]["command"]["status"]["rqst"].as<byte>());
 
             //set the address of the node to poll in the transmission buffer
-            byte sz = 6 + rqt_status.size();
-            smkPacket = {0xFB, sz, 0, 0x0C, 0x00, PACKET_VM_REQUEST};
+            if(pPoll->second.local)
+            {
+                byte sz = 1 + rqt_status.size();
+                smkPacket = {0xFB, sz, 0, 0x0E};
+            }
+            else
+            {
+                byte sz = 6 + rqt_status.size();
+                smkPacket = {0xFB, sz, 0, 0x0C, 0x00, PACKET_VM_REQUEST};
 
-            smkPacket.push_back(pPoll->second.mac.bOff[0]);
-            smkPacket.push_back(pPoll->second.mac.bOff[1]);
-            smkPacket.push_back(pPoll->second.mac.bOff[2]);
+                smkPacket.push_back(pPoll->second.mac.bOff[0]);
+                smkPacket.push_back(pPoll->second.mac.bOff[1]);
+                smkPacket.push_back(pPoll->second.mac.bOff[2]);
+            }
 
             //add custom payload from json file if available
             for(auto c : rqt_status) smkPacket.push_back(c);        
@@ -1089,7 +1127,8 @@ void SpidermeshApi::automaticNodePolling()
                 printApiPacket(smkPacket, "  out: ");
             //write the polling command 
 
-            WriteAndExpectAnwser(pPoll, smkPacket, 0x0E, "status", cbAutomaticPolling);
+            WriteAndExpectAnwser(pPoll, smkPacket, "status", cbAutomaticPolling);
+            if(pPoll->second.local)automaticNodePolling();
         }
         /*
         if(must_increase_polling_iterator)

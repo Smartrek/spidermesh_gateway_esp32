@@ -29,70 +29,60 @@ mesh_t::iterator SmkList::addNode(JsonPair node)
     JsonObject j = node.value().as<JsonObject>();
 
     int m =  macString2Umac(node.key().c_str());
-    auto f = pool.find(m);
+    auto founded = pool.find(m);
+
+    x.mac.address = macString2Umac(node.key().c_str());
+
+    //String node_name = kv.key().c_str();
+    x.name = j["name"].as<String>();
+
+    //load of group
+    if(j.containsKey("group")) x.group = j["group"].as<String>();
+    else x.group = "";
     
-    if (f != pool.end())
+    x.type = j["type"].as<String>();
+    x.enabled = (j.containsKey("enabled")) ? j["enabled"].as<bool>(): true;
+    x.local =(j.containsKey("local"))?j["local"].as<bool>():false;
+    x.sample_rate = (j.containsKey("srate"))?j["srate"].as<int>():0;
+    x.sample_rate = (j.containsKey("sr"))?j["sr"].as<int>():0;        
+    x.priority = (j.containsKey("priority")) ? j["priority"].as<int>() : 0;
+
+    if(j.containsKey("settings"))
     {
-        ret = f;
-    }
-
-    else
-    {
-
-        //mac address
-        x.mac.address = macString2Umac(node.key().c_str());
-
-        //String node_name = kv.key().c_str();
-        x.name = j["name"].as<String>();
-
-        //load of group
-        if(j.containsKey("group")) x.group = j["group"].as<String>();
-        else x.group = "";
-        
-        x.type = j["type"].as<String>();
-        x.enabled = (j.containsKey("enabled")) ? j["enabled"].as<bool>(): true;
-        x.local =(j.containsKey("local"))?j["local"].as<bool>():false;
-        x.sample_rate = (j.containsKey("srate"))?j["srate"].as<int>():0;
-        x.sample_rate = (j.containsKey("sr"))?j["sr"].as<int>():0;        
-        x.priority = (j.containsKey("priority")) ? j["priority"].as<int>() : 0;
-
-        if(j.containsKey("settings"))
+        for(auto s: j["settings"].as<JsonObject>())
         {
-            for(auto s: j["settings"].as<JsonObject>())
-            {
-                setting_t t;
-                t.name = s.key().c_str();
-                t.value = s.value()["value"].as<uint32_t>();
-                t.type = (s.value().containsKey("type"))?s.value()["type"].as<String>():"int32";
-                x.settings.push_back(t);
-            }
-        }       
+            setting_t t;
+            t.name = s.key().c_str();
+            t.value = s.value()["value"].as<uint32_t>();
+            t.type = (s.value().containsKey("type"))?s.value()["type"].as<String>():"int32";
+            x.settings.push_back(t);
+        }
+    }       
 
-        //Internal variable of node
-        x.nb_retry_count=0;
-        x.dataValid=0;
-        x.otaStep = STEP_INIT;
-
-        //addition of the node into the pool list
-        auto it = pool.insert(std::make_pair(x.mac.address,x));
+    //Internal variable of node
+    x.nb_retry_count=0;
+    x.dataValid=0;
+    x.otaStep = STEP_INIT;
 
 
-        //add node to priority list if needed
-        if( x.priority > 0) toPollFaster.push_back(find(x.mac.address));           
+    pool[x.mac.address]= x;
+
+
+    //add node to priority list if needed
+    if( x.priority > 0) toPollFaster.push_back(find(x.mac.address));           
 
 
 
-        ret = find(x.mac.address);
+    ret = find(x.mac.address);
 
-        #if SHOW_LOAD_NODE_DEBUG
-          Serial.print("  new node:");
-          Serial.print(node.key().c_str());
-          Serial.print("  name:");
-          Serial.print(x.name);
-          Serial.print("  type:");
-          Serial.println(x.type);
-        #endif
-    }
+    #if SHOW_LOAD_NODE_DEBUG
+      Serial.print("  new node:");
+      Serial.print(node.key().c_str());
+      Serial.print("  name:");
+      Serial.print(x.name);
+      Serial.print("  type:");
+      Serial.println(x.type);
+    #endif
 
     return ret;
 }
