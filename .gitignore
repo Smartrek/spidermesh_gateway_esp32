@@ -3,3 +3,4 @@ lib/
 .pio/
 src/main.cpp
 *.sh
+*.ini

@@ -130,7 +130,7 @@ bool SpidermeshApi::init()
 
     smkport.begin(PORTIA_BAUDRATE, SERIAL_8N1, RX_PORTIA, TX_PORTIA);
     pinMatrixInAttach(33, 199, false);
-    smkport.setPins(RX_PORTIA,TX_PORTIA, CTS_PORTIA, -1);
+    smkport.setPins(RX_PORTIA,TX_PORTIA,CTS_PORTIA, -1);
     smkport.setHwFlowCtrlMode(HW_FLOWCTRL_CTS);
 
 
