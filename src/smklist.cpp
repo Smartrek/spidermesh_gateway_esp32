@@ -57,7 +57,20 @@ mesh_t::iterator SmkList::addNode(JsonPair node)
             t.type = (s.value().containsKey("type"))?s.value()["type"].as<String>():"int32";
             x.settings.push_back(t);
         }
-    }       
+    }
+    if(j.containsKey("config"))
+    {
+        Serial.printf("  %s",KRED);
+        int idx_reg = 0;
+        for(auto y : j["config"].as<JsonArray>())
+        {
+
+            x.config.push_back(y.as<uint32_t>());
+            Serial.printf("cfg: %d ",y.as<uint32_t>());
+        } 
+        Serial.print(KYEL);
+        Serial.println();
+    }          
 
     //Internal variable of node
     x.nb_retry_count=0;
@@ -182,6 +195,9 @@ bool SmkList::writeNodeListToFile(const char* file)
                 }   
             }
 
+            for(int index = 0; index < n.second.config.size(); index++) {
+                nodeListJson[smac]["config"].add( n.second.config[index]);
+            }
                            
             Serial.println("  mac: " + n.second.getMacAsString());
             Serial.println("  name: " + n.second.name);

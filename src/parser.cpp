@@ -34,7 +34,7 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 
 	JsonObject extract_parameters = SmkList::type_json[type]["parser"][tag]["params"].as<JsonObject>();
 
-	payload["time"]="millis() " + String(millis()); //getTimeFormated();
+	//payload["time"]="millis() " + String(millis()); //getTimeFormated();
 
 	for(auto x:extract_parameters)
 	{

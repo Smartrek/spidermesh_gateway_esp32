@@ -82,6 +82,7 @@ public:
 	uint16_t nb_retry_count; // watchdog
 	JsonObject pjson_type;
 	settings_t settings;
+	std::vector <uint64_t> config;
 };
 
 #endif
