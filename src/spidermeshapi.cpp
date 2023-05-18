@@ -760,7 +760,7 @@ void SpidermeshApi::WriteAndExpectAnwser(  mesh_t::iterator pNode,
     bool found = false;
     for (auto i:listOfExpectedAnswer)
     {
-        if ( i._pNode == pNode && i._request == request){
+        if ( i._pNode == pNode && i._request == request && i._tag == tag){
             found = true;
             printf("%sFOUND%s", KRED, KNRM);
             break;

@@ -420,9 +420,8 @@ int SmkList::getNbBytePacket(mesh_t::iterator  pNode, String tag)
         }
     }
     
-    int nbByte = param_pos+param_size;
+    int nbByte = (param_pos+param_size)/8;
     if((param_pos+param_size)%8) nbByte++;
-    nbByte/=8;
     //Serial.printf("%s  %d\n",KYEL,nbByte);
     return nbByte;
 }
