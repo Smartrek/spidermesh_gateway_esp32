@@ -261,7 +261,7 @@ bool SmkParser::rfPayloadToInt64(apiframe &packet, String tag, std::vector<meta_
 
 
 
-double SmkParser::applyParams(int64_t value, JsonObject def_params)
+double SmkParser::applyParams(int64_t value, JsonObject def_params, bool direction)
 {
 	double fResult = 0;
 
@@ -281,7 +281,8 @@ double SmkParser::applyParams(int64_t value, JsonObject def_params)
 	if(def_params.containsKey("gain"))
 	{
 		double g = def_params["gain"].as<double>();
-		fResult *= g;
+		if(direction) fResult *= g;
+		else fResult /= g;
 		#if SHOW_DEBUG_EXTRACT_DATA
 		Serial.print(" g= ");
 		Serial.print(fResult);
@@ -291,7 +292,9 @@ double SmkParser::applyParams(int64_t value, JsonObject def_params)
 	if(def_params.containsKey("div"))
 	{
 		double d = def_params["div"].as<double>();
-		fResult /= d;
+		if(direction)fResult /= d;
+		else fResult *= d;
+
 		#if SHOW_DEBUG_EXTRACT_DATA
 		Serial.print(" d= ");
 		Serial.print(fResult);

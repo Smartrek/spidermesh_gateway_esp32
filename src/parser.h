@@ -51,9 +51,10 @@ class SmkParser
 	 * 
 	 * @param value raw value
 	 * @param def_params definition of the variable to know how to convert the raw value
+	 * @param direction true for reading RF packet, false for writing RF packet
 	 * @return double 
 	 */
-	static double applyParams(int64_t value, JsonObject def_params);
+	static double applyParams(int64_t value, JsonObject def_params, bool direction = true);
 
 	/**
 	 * @brief Get the raw value from a payload form of a number of bits (not number of byte) limitation of 32bits variable
