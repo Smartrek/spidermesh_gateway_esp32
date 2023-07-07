@@ -287,7 +287,7 @@ String Spidermesh::translateOffStateToString()
 
 String Spidermesh::getStateMachineStatus()
 {
-	SpiRamJsonDocument jsonBuffer(10000);
+	DynamicJsonDocument jsonBuffer(10000);
 	String ret = "";
 	jsonBuffer.clear();
 
@@ -339,7 +339,7 @@ String Spidermesh::getSmk900Firmware(bool start)
 		setState(READ_VERSION_NODES);
 		nodes.resetStep(true);
 	}
-	SpiRamJsonDocument jsonBuffer(10000);
+	DynamicJsonDocument jsonBuffer(10000);
 
 	jsonBuffer.clear();
 	JsonObject nodeList = jsonBuffer.createNestedObject("nodeList");
@@ -685,7 +685,7 @@ bool Spidermesh::ProcessState(bool eob)
 			if(!initDoneOnce)
 			{
 				//Creation of the gateway node
-				SpiRamJsonDocument gateway_json(200);
+				DynamicJsonDocument gateway_json(200);
 				gateway_json.createNestedObject(smac);
 				gateway_json[smac]["name"]="main";
 				gateway_json[smac]["type"]="gateway";

@@ -221,7 +221,7 @@ void setNtpClock(bool force)
 {
     if(ntpServerSet && !force) return;
 
-    SpiRamJsonDocument timeJson(1000);
+    DynamicJsonDocument timeJson(1000);
     deserializeJson(timeJson, readFile("/ntp.json"));
     //configTime(timeJson["gmtOffset_sec"], timeJson["daylightOffset_sec"], timeJson["server"]);
 

@@ -8,7 +8,6 @@
 #include <logger.h>
 #define ARDUINOJSON_USE_LONG_LONG 1
 #include <ArduinoJson.h>
-#include <spiramjson.h>
 
 
 union value_converter_union
