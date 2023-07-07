@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <SPIFFS.h>
 #include <FastCRC.h>
+#define ARDUINOJSON_USE_LONG_LONG 1
 #include <ArduinoJson.h>
 #include <list>
 #include <utils.h>

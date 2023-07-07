@@ -1,6 +1,6 @@
 #include <smklist.h>
 
-DynamicJsonDocument SmkList::type_json(SIZE_OF_DYNAMIC_JSON_FILE);
+SpiRamJsonDocument SmkList::type_json(SIZE_OF_DYNAMIC_JSON_FILE);
 mesh_t SmkList::pool;
 PollingNodeList_t SmkList::toPollFaster;
 
@@ -110,7 +110,7 @@ bool SmkList::loadNodes(String nodes)
     Serial.printf("--------------------------------\r\n");
   #endif
 
-    DynamicJsonDocument nodes_json(SIZE_OF_DYNAMIC_JSON_FILE);
+    SpiRamJsonDocument nodes_json(SIZE_OF_DYNAMIC_JSON_FILE);
 
     DeserializationError error = deserializeJson(nodes_json, nodes);
     if(error)
@@ -160,7 +160,7 @@ bool SmkList::writeNodeListToFile(const char* file)
     SPIFFS.remove(file);
 
     //StaticJsonDocument<2000> nodeListJson;
-    DynamicJsonDocument nodeListJson(10000);//SIZE_OF_DYNAMIC_JSON_FILE);
+    SpiRamJsonDocument nodeListJson(10000);//SIZE_OF_DYNAMIC_JSON_FILE);
 
 
     Serial.println("------------ nodes that will be save -------------");
@@ -241,7 +241,7 @@ JsonVariant SmkList::getTypeJsonVariant()
 bool SmkList::loadParamFiles()
 {
     bool ret = true;
-    DynamicJsonDocument json_buffer(SIZE_OF_DYNAMIC_JSON_FILE);
+    SpiRamJsonDocument json_buffer(SIZE_OF_DYNAMIC_JSON_FILE);
     String file = "/nodes.json";
   #if SHOW_LOAD_NODE_DEBUG
     Serial.print("Open file:");
@@ -278,7 +278,7 @@ bool SmkList::loadParamFiles()
     {
         if(!type_json.containsKey(n.second.type))
         {      
-            DynamicJsonDocument new_type(SIZE_OF_DYNAMIC_JSON_TYPE);
+            SpiRamJsonDocument new_type(SIZE_OF_DYNAMIC_JSON_TYPE);
             new_type.clear();
             String path_type_file = "/type/" + n.second.type + "/parser.json";
           #if SHOW_LOAD_NODE_DEBUG
@@ -354,7 +354,7 @@ bool SmkList::addType(String type, JsonVariant src_type_json)
 //------------------------------------------------------------------------------------------------------------
 bool SmkList::addType(String type, String json_string)
 {
-    DynamicJsonDocument new_type(SIZE_OF_DYNAMIC_JSON_TYPE);
+    SpiRamJsonDocument new_type(SIZE_OF_DYNAMIC_JSON_TYPE);
     
     DeserializationError error = deserializeJson(new_type, json_string);
     if(error)
@@ -373,7 +373,7 @@ bool SmkList::addType(String type, String json_string)
 bool SmkList::loadTypes(String json_string)
 {
     bool ret = true;
-    DynamicJsonDocument new_type(SIZE_OF_DYNAMIC_JSON_TYPE);
+    SpiRamJsonDocument new_type(SIZE_OF_DYNAMIC_JSON_TYPE);
     
     DeserializationError error = deserializeJson(type_json, json_string);
     if(error)

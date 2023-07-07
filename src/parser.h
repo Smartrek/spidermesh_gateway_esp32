@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 #include <spidermeshapi.h>
-//#define ARDUINOJSON_USE_DOUBLE 1
+#define ARDUINOJSON_USE_LONG_LONG 1
 #include <ArduinoJson.h>
 #include <utils.h>
 

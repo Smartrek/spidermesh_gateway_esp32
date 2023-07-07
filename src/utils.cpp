@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "time.h"
+#define ARDUINOJSON_USE_LONG_LONG 1
 #include <ArduinoJson.h>
 
 bool ntpServerSet = false;
@@ -220,7 +221,7 @@ void setNtpClock(bool force)
 {
     if(ntpServerSet && !force) return;
 
-    DynamicJsonDocument timeJson(1000);
+    SpiRamJsonDocument timeJson(1000);
     deserializeJson(timeJson, readFile("/ntp.json"));
     //configTime(timeJson["gmtOffset_sec"], timeJson["daylightOffset_sec"], timeJson["server"]);
 

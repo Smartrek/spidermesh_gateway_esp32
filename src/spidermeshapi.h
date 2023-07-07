@@ -5,6 +5,7 @@
 #include <vector>
 #include <smklist.h>
 #include <HardwareProfile.h>
+#define ARDUINOJSON_USE_LONG_LONG 1
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 #include <HardwareSerial.h>

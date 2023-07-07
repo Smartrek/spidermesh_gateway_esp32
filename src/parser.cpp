@@ -342,7 +342,7 @@ bool SmkParser::getlogfromdict(JsonObject def_params, JsonVariant ret_result, ap
 
 	//ret_result["tttt"] = "tttt";
 	
-	DynamicJsonDocument jsondict(SIZE_OF_DYNAMIC_JSON_FILE/2);
+	SpiRamJsonDocument jsondict(SIZE_OF_DYNAMIC_JSON_FILE);
 	DeserializationError error = deserializeJson(jsondict, readFile(pathDict.c_str()));
     if(error)
     {
@@ -439,7 +439,7 @@ bool SmkParser::getErrorFromDict(JsonObject def_params, JsonVariant ret_result, 
 	String pathDict = "/type/"+ stype +"/"+ def_params["table"].as<String>();
 
 
-	DynamicJsonDocument error_dict(SIZE_OF_DYNAMIC_JSON_FILE/2);
+	SpiRamJsonDocument error_dict(SIZE_OF_DYNAMIC_JSON_FILE/2);
 	deserializeJson(error_dict, readFile(pathDict.c_str()));
 
 

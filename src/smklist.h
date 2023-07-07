@@ -6,6 +6,7 @@
 #include <SPIFFS.h>
 #include <map>
 #include <smknode.h>
+#include <spiramjson.h>
 
 
 typedef std::map<uint32_t, SmkNode> mesh_t;
@@ -40,9 +41,9 @@ public:
 class SmkList
 {
 private:
-	//static DynamicJsonDocument type_json;
+	//static SpiRamJsonDocument type_json;
 public:
-	static DynamicJsonDocument type_json;
+	static SpiRamJsonDocument type_json;
 	// std::map<String, NodeType_t> nType;
 	static JsonVariant getTypeJsonVariant();
 
