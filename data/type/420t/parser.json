@@ -1,0 +1,19 @@
+{
+    "name":"4-20ma Transmitter",
+    "parser":
+    {
+      "status":{
+        "params":{
+          "rssi":{"pos":[0,8]},
+          "battery":{"pos":[8,8],"gain":5, "fix":2, "u":"V"},
+          "current":{"pos":[16,16]}
+          }
+      }
+    },
+    "config":[{"SETCURRENT":{"pos":[0,16]}},
+{"OFFSET":{"pos":[16,16],"gain":0.1,"fix":1}},
+{"UNITID":{"pos":[32,8]}},
+{"MAXRANGE":{"pos":[40,20],"default":1000,"gain":0.1,"fix":1}},
+{"RAW":{"pos":[60,20],"gain":0.1,"fix":1}},
+{"MODE":{"pos":[80,1]}}]
+}

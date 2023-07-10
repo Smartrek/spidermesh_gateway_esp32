@@ -1,0 +1,23 @@
+{
+  "name":"4-20ma Receiver",
+  "parser":
+  {
+    "status":{
+      "params":{
+        "rssi":{"pos":[0,8]},
+        "battery":{"pos":[8,8],"gain":5, "fix":2, "u":"V"},
+        "current":{"pos":[16,16], "fix":2, "u":"%"},
+        "totalizer":{"pos":[32,32]},
+        "totalizer time":{"pos":[64,32]}
+      }
+    }
+  },
+  "config":[{"CURRENTLO":{"pos":[0,16]}},
+{"CURRENTHI":{"pos":[16,16],"default":100}},
+{"OFFSET":{"pos":[32,16],"gain":0.1,"fix":1}},
+{"UNITID":{"pos":[48,8]}},
+{"MAXRANGE":{"pos":[56,24],"default":100,"gain":0.1,"fix":1}},
+{"RSTMECCT":{"pos":[80,1]}},
+{"mAttinyFLAG":{"pos":[81,2]}},
+{"SCALING":{"pos":[88,10],"gain":0.1,"fix":1}}]
+}

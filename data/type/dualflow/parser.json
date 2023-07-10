@@ -1,0 +1,28 @@
+{
+  "name":"Dual Flowmeter",
+  "parser":
+  {
+    "status":{
+      "params":{
+        "rssi":{"pos":[0,8]},
+        "battery":{"pos":[8,8],"gain":5, "fix":2, "u":"V"},
+        "flow":{"pos":[16,16],"fix":1, "u":"L/s"},
+        "volume pos":{"pos":[32,32], "u":"L"},
+        "volume neg":{"pos":[64,32], "u":"L"},
+        "temperature":{"pos":[96,12], "fix":1, "u":"C"},
+        "pressure":{"pos":[108,12], "fix":1, "u":"PSI"},
+        "code":{"pos":[120,8]}
+      }
+    }
+  },
+  "config":[{"RESETFLAG":{"pos":[0,1]}},
+{"VOLUMEUNIT":{"pos":[1,4]}},
+{"TIMEUNIT":{"pos":[5,3]}},
+{"MINFLOW":{"pos":[8,20],"default":-3000,"gain":0.1,"fix":1}},
+{"MAXFLOW":{"pos":[28,20],"default":3000,"gain":0.1,"fix":1}},
+{"MINPRESSURE":{"pos":[48,12],"gain":0.1,"fix":1}},
+{"MAXPRESSURE":{"pos":[60,12],"gain":0.1,"fix":1}},
+{"KFACTOR":{"pos":[72,20],"default":1,"gain":0.001,"fix":3}},
+{"CHOOSESENSOR":{"pos":[92,4]}},
+{"PRESSUREZEROOFFSET":{"pos":[96,10],"gain":0.01,"fix":2}}]
+}

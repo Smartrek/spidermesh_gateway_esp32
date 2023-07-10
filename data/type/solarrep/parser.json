@@ -1,0 +1,19 @@
+{
+  "name":"Solar Repeater",
+  "parser":
+  {
+    "status":{
+      "params":{
+        "rssi":{"pos":[0,8]},
+        "voltage":{"pos":[8,16], "fix":2, "u":"V"},
+        "nodeid":{"pos":[24,4]},
+        "onbackup":{"pos":[28,1]},
+        "temperature":{"pos":[32,16], "fix":1, "u":"C"},
+        "charge current":{"pos":[48,16], "fix":1, "u":"mA"},
+        "power":{"pos":[64,8], "u":"%"}
+      }
+    }
+  },
+  "config":[{"ENABLETXLEDFLAG":{"pos":[0,1],"default":1}},
+  {"SHOWVOLTAGEFLAG":{"pos":[1,1]}}]
+}
