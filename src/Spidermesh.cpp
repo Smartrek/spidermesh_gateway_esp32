@@ -287,7 +287,7 @@ String Spidermesh::translateOffStateToString()
 
 String Spidermesh::getStateMachineStatus()
 {
-	DynamicJsonDocument jsonBuffer(10000);
+	DynamicJsonDocument jsonBuffer(100000);
 	String ret = "";
 	jsonBuffer.clear();
 
@@ -303,7 +303,7 @@ String Spidermesh::getStateMachineStatus()
 		if (n.second.otaActive)
 		{
 
-			String m = SmkList::mac2String(n.first);
+			String m = macIntToString(n.first);
 			nodeList[m].createNestedObject("state");
 			nodeList[m]["state"] = n.second.otaStep;
 			nodeList[m]["detail"] = n.second.labelState;
@@ -339,7 +339,7 @@ String Spidermesh::getSmk900Firmware(bool start)
 		setState(READ_VERSION_NODES);
 		nodes.resetStep(true);
 	}
-	DynamicJsonDocument jsonBuffer(10000);
+	DynamicJsonDocument jsonBuffer(100000);
 
 	jsonBuffer.clear();
 	JsonObject nodeList = jsonBuffer.createNestedObject("nodeList");
@@ -350,7 +350,7 @@ String Spidermesh::getSmk900Firmware(bool start)
 	{
 		if (n.second.otaActive)
 		{
-			String m = SmkList::mac2String(n.first);
+			String m = macIntToString(n.first);
 			nodeList[m].createNestedObject("state");
 			nodeList[m]["detail"] = n.second.labelState;
 			nodeList[m]["old_version"] = n.second.old_firmware.getVersionString();
@@ -680,12 +680,13 @@ bool Spidermesh::ProcessState(bool eob)
 			//SaveGatewayMacAddress(packet);
 			IPAddress RepliedMacAddress = {packet[10], packet[9], packet[8], packet[7]}; 
 			String smac =RepliedMacAddress.toString();
-			uint32_t a = SmkList::macString2Umac(smac);
+			uint32_t a;
+			macStringToInt(smac, &a);
 
 			if(!initDoneOnce)
 			{
 				//Creation of the gateway node
-				DynamicJsonDocument gateway_json(200);
+				DynamicJsonDocument gateway_json(300);
 				gateway_json.createNestedObject(smac);
 				gateway_json[smac]["name"]="main";
 				gateway_json[smac]["type"]="gateway";
@@ -693,7 +694,7 @@ bool Spidermesh::ProcessState(bool eob)
 				gateway_json[smac]["srate"]=-1;
 				//for loop as a work around to get a JsonPair
 				for(auto jp:gateway_json.as<JsonObject>()) gateway = nodes.addNode(jp);
-				gateway->second.pjson_type = nodes.type_json["gateway"].as<JsonVariant>();
+				gateway->second.pjson_type = (*nodes.type_json)["gateway"].as<JsonVariant>();
 
 
 				PRT("GATEWAY mac is: ");

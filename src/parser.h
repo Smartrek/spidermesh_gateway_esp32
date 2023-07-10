@@ -21,6 +21,8 @@ class SmkParser
 {
   public:
 
+	static JsonObject type_json;
+
 	/**
 	 * @brief Convert the raw RF payload to a JSON format from the JSON parser file
 	 * 

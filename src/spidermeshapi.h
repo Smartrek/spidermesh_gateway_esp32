@@ -260,7 +260,7 @@ public:
 	{
 		String ret = "";
 
-		return SmkList::mac2String(gateway->second.mac.address);
+		return macIntToString(gateway->second.mac.address);
 	};
 
 	static void setApiMsgFlag(bool msg_in, bool msg_out, bool eob)
@@ -347,7 +347,7 @@ public:
 		bool ret = true;
 		if (isValidMac(node))
 		{
-			setFocusMode(SmkList::macString2Umac(node));
+			setFocusMode(node);
 			Serial.print("setFocusMode: ");
 			Serial.println(node);
 			delay(10);

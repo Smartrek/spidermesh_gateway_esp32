@@ -144,6 +144,9 @@ bool SpidermeshApi::init()
 
 
     //Serial.println("Init portia done");
+
+    //creation of the jsonbuffer into the psram, since it is a large chunck
+    nodes.type_json = new DynamicJsonDocument (SIZE_OF_DYNAMIC_JSON_TYPE);
     return true;
 }
 

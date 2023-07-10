@@ -1,6 +1,6 @@
 #include <parser.h>
-
-
+#define SHOW_DEBUG_EXTRACT_DATAJSON true
+JsonObject SmkParser::type_json;
 
 bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payload, String &type, bool includeUnits)
 {
@@ -11,11 +11,11 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 	Serial.print ("  --> tag: ");
 	Serial.println (tag);
 
-	if(!SmkList::type_json.containsKey(type)) Serial.printf("Node type:%s not available\n", type);
+	if(!type_json.containsKey(type)) Serial.printf("Node type:%s not available\n", type);
   #endif
 
 
-	if(SmkList::type_json[type]["parser"].containsKey(tag))
+	if( type_json[type]["parser"].containsKey(tag))
 	{
 		#if SHOW_DEBUG_EXTRACT_DATAJSON
 		Serial.println("  default status key is founded");
@@ -32,7 +32,7 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 	}
 
 
-	JsonObject extract_parameters = SmkList::type_json[type]["parser"][tag]["params"].as<JsonObject>();
+	JsonObject extract_parameters = type_json[type]["parser"][tag]["params"].as<JsonObject>();
 
 	//payload["time"]="millis() " + String(millis()); //getTimeFormated();
 
@@ -160,7 +160,7 @@ bool SmkParser::rfPayloadToInt64(apiframe &packet, String tag, std::vector<meta_
 {
 	if(packet.size()<=10) return false;
 
-	if(SmkList::type_json[type]["parser"].containsKey(tag))
+	if(type_json[type]["parser"].containsKey(tag))
 	{
 		#if SHOW_DEBUG_EXTRACT_DATA
 		Serial.println("  default status key is founded");
@@ -177,7 +177,7 @@ bool SmkParser::rfPayloadToInt64(apiframe &packet, String tag, std::vector<meta_
 	}
 
 
-	JsonObject extract_parameters = SmkList::type_json[type]["parser"][tag]["params"].as<JsonObject>();
+	JsonObject extract_parameters = type_json[type]["parser"][tag]["params"].as<JsonObject>();
 
 	meta_conversion t;
 	t.value = millis();

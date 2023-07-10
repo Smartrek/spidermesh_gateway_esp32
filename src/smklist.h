@@ -6,7 +6,8 @@
 #include <SPIFFS.h>
 #include <map>
 #include <smknode.h>
-
+#define ARDUINOJSON_USE_LONG_LONG 1
+#include <ArduinoJson.h>
 
 typedef std::map<uint32_t, SmkNode> mesh_t;
 typedef std::function<void(mesh_t::iterator pNode, apiframe packet, bool success, String tag)> ExpectCallback;
@@ -40,16 +41,17 @@ public:
 class SmkList
 {
 private:
-	//static DynamicJsonDocument type_json;
+	//DynamicJsonDocument type_json;
 public:
-	static DynamicJsonDocument type_json;
+	
+	DynamicJsonDocument* type_json;
 	// std::map<String, NodeType_t> nType;
-	static JsonVariant getTypeJsonVariant();
+	JsonVariant getTypeJsonVariant();
 
-	static mesh_t pool;
+	mesh_t pool;
 
-	static PollingNodeList_t toPollFaster;
-	static int idxNodeToPollFast;
+	PollingNodeList_t toPollFaster;
+	int idxNodeToPollFast;
 
 
 public:
@@ -59,11 +61,11 @@ public:
 
 	bool loadParamFiles();
 	bool writeNodeListToFile(const char* file = "/nodes.json");
-	static bool loadNodes(JsonVariant nodes_json);
-	static bool loadNodes(String nodes);
-	static bool addType(String type, JsonVariant src_type_json);
-	static bool addType(String type, String json_string);
-	static bool loadTypes(String json_string);
+	bool loadNodes(JsonVariant nodes_json);
+	bool loadNodes(String nodes);
+	bool addType(String type, JsonVariant src_type_json);
+	bool addType(String type, String json_string);
+	bool loadTypes(String json_string);
 
 	void assignTypeToNode();
 	int getNbBytePacket(mesh_t::iterator  pNode, String tag="status");
@@ -72,7 +74,7 @@ public:
 
 
 
-	static mesh_t::iterator find(uint32_t add)
+	mesh_t::iterator find(uint32_t add)
 	{
 		for (auto x = pool.begin(); x != pool.end(); x++)
 		{
@@ -92,17 +94,17 @@ private:
 public:
 	void addParamToUpdate(String node_name, String name, String value) { listParam.push_back(ParamList_t(node_name, name, value)); };
 
-	static mesh_t::iterator addNode(JsonPair node);
-	static mesh_t::iterator addNode(JsonObject node);
+	mesh_t::iterator addNode(JsonPair node);
+	mesh_t::iterator addNode(JsonObject node);
 	String isMacExist(String mac);
 	String isMacExist(uint32_t umac);
 
 	bool remove(String name);
 	bool remove(uint32_t umac) { return pool.erase(umac); };
 
-	static uint32_t macString2Umac(String mac);
-	static String mac2String(uint32_t add);
-	static String macInt2String(uint32_t add);
+	uint32_t macString2Umac(String mac);
+	String mac2String(uint32_t add);
+	String macInt2String(uint32_t add);
 
 	void resetStep(bool force = false)
 	{

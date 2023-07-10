@@ -1,24 +1,18 @@
 #include <smklist.h>
 
-DynamicJsonDocument SmkList::type_json(SIZE_OF_DYNAMIC_JSON_FILE);
-mesh_t SmkList::pool;
-PollingNodeList_t SmkList::toPollFaster;
-
-
-int SmkList::idxNodeToPollFast;
-
 
 //------------------------------------------------------------------------------------------------------------
 SmkList::SmkList()
 {
-
+    //Serial.println("*******************************************************");
+    
 }
 
 mesh_t::iterator SmkList::addNode(JsonObject node)
 {
     mesh_t::iterator  ret;
     for(auto jp:node) ret = addNode(jp);
-    ret->second.pjson_type = type_json["gateway"].as<JsonVariant>();
+    ret->second.pjson_type = (*type_json)["gateway"].as<JsonVariant>();
     return ret;
 }
 
@@ -159,8 +153,7 @@ bool SmkList::writeNodeListToFile(const char* file)
     }    
     SPIFFS.remove(file);
 
-    //StaticJsonDocument<2000> nodeListJson;
-    DynamicJsonDocument nodeListJson(10000);//SIZE_OF_DYNAMIC_JSON_FILE);
+    DynamicJsonDocument nodeListJson(SIZE_OF_DYNAMIC_JSON_FILE);
 
 
     Serial.println("------------ nodes that will be save -------------");
@@ -234,7 +227,7 @@ bool SmkList::writeNodeListToFile(const char* file)
 //------------------------------------------------------------------------------------------------------------
 JsonVariant SmkList::getTypeJsonVariant()
 {
-    return type_json.as<JsonVariant>();
+    return (*type_json).as<JsonVariant>();
 }
 
 //------------------------------------------------------------------------------------------------------------
@@ -242,6 +235,7 @@ bool SmkList::loadParamFiles()
 {
     bool ret = true;
     DynamicJsonDocument json_buffer(SIZE_OF_DYNAMIC_JSON_FILE);
+    type_json = new DynamicJsonDocument (SIZE_OF_DYNAMIC_JSON_FILE);
     String file = "/nodes.json";
   #if SHOW_LOAD_NODE_DEBUG
     Serial.print("Open file:");
@@ -276,9 +270,9 @@ bool SmkList::loadParamFiles()
     //for all node, check if type is not loaded, if not loaded, read json file to load it
     for(auto n:pool)
     {
-        if(!type_json.containsKey(n.second.type))
+        if(!(*type_json).containsKey(n.second.type))
         {      
-            DynamicJsonDocument new_type(SIZE_OF_DYNAMIC_JSON_TYPE);
+            DynamicJsonDocument new_type(SIZE_OF_DYNAMIC_JSON_FILE);
             new_type.clear();
             String path_type_file = "/type/" + n.second.type + "/parser.json";
           #if SHOW_LOAD_NODE_DEBUG
@@ -325,7 +319,7 @@ bool SmkList::loadParamFiles()
             Serial.print("+ new inserted type: ");
             Serial.println(n.second.type);
             sNew_type="";
-            serializeJson(type_json.as<JsonVariant>(), sNew_type);
+            serializeJson((*type_json).as<JsonVariant>(), sNew_type);
             Serial.println(sNew_type);
             Serial.println("  ========================");
           #endif
@@ -345,8 +339,8 @@ bool SmkList::addType(String type, JsonVariant src_type_json)
     //TODO: optionnal, test could be done to verify minimum requirement of type since user could use this function
 
     //check if type doesn't exist
-    if(!type_json.containsKey(type))
-      type_json[type].set(src_type_json);
+    if(!(*type_json).containsKey(type))
+      (*type_json)[type].set(src_type_json);
 
     return true;
 }
@@ -354,7 +348,7 @@ bool SmkList::addType(String type, JsonVariant src_type_json)
 //------------------------------------------------------------------------------------------------------------
 bool SmkList::addType(String type, String json_string)
 {
-    DynamicJsonDocument new_type(SIZE_OF_DYNAMIC_JSON_TYPE);
+    DynamicJsonDocument new_type(SIZE_OF_DYNAMIC_JSON_FILE);
     
     DeserializationError error = deserializeJson(new_type, json_string);
     if(error)
@@ -375,7 +369,7 @@ bool SmkList::loadTypes(String json_string)
     bool ret = true;
     DynamicJsonDocument new_type(SIZE_OF_DYNAMIC_JSON_TYPE);
     
-    DeserializationError error = deserializeJson(type_json, json_string);
+    DeserializationError error = deserializeJson((*type_json), json_string);
     if(error)
     {
       #if SHOW_LOAD_NODE_DEBUG
@@ -383,7 +377,7 @@ bool SmkList::loadTypes(String json_string)
       #endif
       ret = true;
     }
-    else type_json.shrinkToFit();
+    else (*type_json).shrinkToFit();
 
     return ret;
 }
@@ -395,8 +389,8 @@ void SmkList::assignTypeToNode()
     auto n = pool.begin();
     for(int i=0; i< pool.size(); i++)
     {
-        if(type_json.containsKey(n->second.type)) 
-          n->second.pjson_type=type_json[n->second.type].as<JsonVariant>();
+        if((*type_json).containsKey(n->second.type)) 
+          n->second.pjson_type=(*type_json)[n->second.type].as<JsonVariant>();
         else
           Serial.println("Type to assign does't exist");
     }  
@@ -408,8 +402,8 @@ int SmkList::getNbBytePacket(mesh_t::iterator  pNode, String tag)
     int param_size=0;
 
     //Serial.printf("%s  %s  %s  ",KYEL,pNode->second.type,tag);
-    if(!type_json[pNode->second.type]["parser"].containsKey(tag)) return -1;
-    for(auto p:type_json[pNode->second.type]["parser"][tag]["params"].as<JsonObject>())
+    if(!(*type_json)[pNode->second.type]["parser"].containsKey(tag)) return -1;
+    for(auto p:(*type_json)[pNode->second.type]["parser"][tag]["params"].as<JsonObject>())
     {
         auto idx = p.value().as<JsonObject>()["pos"];
         //find the last param, normaly the last but we take no chance
