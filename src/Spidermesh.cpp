@@ -722,6 +722,7 @@ bool Spidermesh::ProcessState(bool eob)
 		else{
 			nodes.loadParamFiles();
 		} 
+		SmkParser::type_json = (*nodes.type_json).as<JsonObject>(); 
 		setState(GET_NODE_TYPE);
 	}
 	else if (isState(GET_NODE_TYPE))
