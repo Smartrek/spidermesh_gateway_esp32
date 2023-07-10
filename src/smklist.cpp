@@ -35,6 +35,7 @@ mesh_t::iterator SmkList::addNode(JsonPair node)
     else x.group = "";
     
     x.type = j["type"].as<String>();
+    addType(x.type);
     x.enabled = (j.containsKey("enabled")) ? j["enabled"].as<bool>(): true;
     x.local =(j.containsKey("local"))?j["local"].as<bool>():false;
     x.sample_rate = (j.containsKey("srate"))?j["srate"].as<int>():0;
@@ -59,11 +60,34 @@ mesh_t::iterator SmkList::addNode(JsonPair node)
         for(auto y : j["config"].as<JsonArray>())
         {
 
-            x.config.push_back(y.as<uint32_t>());
-            Serial.printf("cfg: %d ",y.as<uint32_t>());
+            x.config.push_back(y.as<uint64_t>());
+            Serial.printf("cfg: %d ",y.as<uint64_t>());
         } 
         Serial.print(KYEL);
         Serial.println();
+    }
+    else if((*type_json).containsKey(x.type))
+    {
+        Serial.printf("%s type exist\n", KGRN);
+        if((*type_json)[x.type].containsKey("config"))
+        {
+            Serial.printf("%s config exist\n", KGRN);
+
+            for(JsonObject c : (*type_json)[x.type]["config"].as<JsonArray>())
+            {
+                for(JsonPair pair : c)
+                {
+                  JsonObject cdetails = pair.value().as<JsonObject>();
+                  Serial.printf("%s name exist", pair.key());
+                  if(cdetails.containsKey("default"))
+                    x.config.push_back(cdetails["default"].as<uint64_t>());
+                  else
+                    x.config.push_back(0);
+                }
+            }
+        }       
+        
+
     }          
 
     //Internal variable of node
@@ -270,62 +294,7 @@ bool SmkList::loadParamFiles()
     //for all node, check if type is not loaded, if not loaded, read json file to load it
     for(auto n:pool)
     {
-        if(!(*type_json).containsKey(n.second.type))
-        {      
-            DynamicJsonDocument new_type(SIZE_OF_DYNAMIC_JSON_FILE);
-            new_type.clear();
-            String path_type_file = "/type/" + n.second.type + "/parser.json";
-          #if SHOW_LOAD_NODE_DEBUG
-            Serial.print("Open file: ");
-            Serial.println(path_type_file);
-            Serial.println(readFile(path_type_file)); // only for debug
-          #endif
-            
-            File f=SPIFFS.open(path_type_file);
-            if(!f)
-            {
-              #if SHOW_LOAD_NODE_DEBUG
-                Serial.print("  error while loading ");
-                Serial.println(path_type_file);
-              #endif
-                continue;
-                return false;
-            }
-            DeserializationError error = deserializeJson(new_type, f);
-            if(error)
-            {
-              #if SHOW_LOAD_NODE_DEBUG
-                Serial.print("  error during deserialization of ");
-                Serial.println(path_type_file);
-                continue;
-              #endif
-            }
-            f.close();
 
-            new_type.shrinkToFit();
-
-          addType(n.second.type, new_type.as<JsonVariant>());           //insert the type in json format in the list of supported type
-
-          #if SHOW_LOAD_NODE_DEBUG
-            Serial.printf("--------------------------------\r\n");
-            Serial.print("  type: ");
-            Serial.print(n.second.type);
-            Serial.print(" loaded    size: ");
-            Serial.println(new_type.memoryUsage());
-            String sNew_type="";
-            serializeJson(n.second.pjson_type, sNew_type);
-            Serial.println(sNew_type);
-            Serial.printf("--------------------------------\r\n");
-            Serial.print("+ new inserted type: ");
-            Serial.println(n.second.type);
-            sNew_type="";
-            serializeJson((*type_json).as<JsonVariant>(), sNew_type);
-            Serial.println(sNew_type);
-            Serial.println("  ========================");
-          #endif
-
-
-        }
     }
     //shrink reduce heap memory usage 
     json_buffer.shrinkToFit();
@@ -334,14 +303,60 @@ bool SmkList::loadParamFiles()
 }
 
 //------------------------------------------------------------------------------------------------------------
-bool SmkList::addType(String type, JsonVariant src_type_json)
+bool SmkList::addType(String type)
 {
     //TODO: optionnal, test could be done to verify minimum requirement of type since user could use this function
 
     //check if type doesn't exist
     if(!(*type_json).containsKey(type))
-      (*type_json)[type].set(src_type_json);
+    {      
+        DynamicJsonDocument new_type(SIZE_OF_DYNAMIC_JSON_FILE);
+        String path_type_file = "/type/" + type + "/parser.json";
+      #if SHOW_LOAD_NODE_DEBUG
+        Serial.print("Open file: ");
+        Serial.println(path_type_file);
+        Serial.println(readFile(path_type_file)); // only for debug
+      #endif
+        
+      File f=SPIFFS.open(path_type_file);
+      if(!f)
+      {
+        #if SHOW_LOAD_NODE_DEBUG
+          Serial.print("  error while loading ");
+          Serial.println(path_type_file);
+        #endif
 
+          return false;
+      }
+      DeserializationError error = deserializeJson(new_type, f);
+      if(error)
+      {
+        #if SHOW_LOAD_NODE_DEBUG
+          Serial.print("  error during deserialization of ");
+          Serial.println(path_type_file);
+        #endif
+      }
+      f.close();
+
+      (*type_json)[type].set(new_type);
+
+      #if SHOW_LOAD_NODE_DEBUG
+        Serial.printf("--------------------------------\r\n");
+        Serial.print("  type: ");
+        Serial.print(type);
+        Serial.print(" loaded    size: ");
+        Serial.println(new_type.memoryUsage());
+        String sNew_type="";
+        Serial.println(sNew_type);
+        Serial.printf("--------------------------------\r\n");
+        Serial.print("+ new inserted type: ");
+        Serial.println(type);
+        sNew_type="";
+        serializeJson((*type_json).as<JsonVariant>(), sNew_type);
+        Serial.println(sNew_type);
+        Serial.println("  ========================");
+      #endif
+    }
     return true;
 }
 

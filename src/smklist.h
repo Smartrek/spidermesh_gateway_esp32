@@ -70,7 +70,7 @@ public:
 	bool writeNodeListToFile(const char* file = "/nodes.json");
 	bool loadNodes(JsonVariant nodes_json);
 	bool loadNodes(String nodes);
-	bool addType(String type, JsonVariant src_type_json);
+	bool addType(String type);
 	bool addType(String type, String json_string);
 	bool loadTypes(String json_string);
 
