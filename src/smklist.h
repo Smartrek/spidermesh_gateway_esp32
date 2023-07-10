@@ -9,8 +9,15 @@
 #define ARDUINOJSON_USE_LONG_LONG 1
 #include <ArduinoJson.h>
 
+enum class ApiResponseCode
+{
+	TIMEOUT,
+	SUCCESS,
+	CORRUPT
+};
+
 typedef std::map<uint32_t, SmkNode> mesh_t;
-typedef std::function<void(mesh_t::iterator pNode, apiframe packet, bool success, String tag)> ExpectCallback;
+typedef std::function<void(mesh_t::iterator pNode, apiframe packet, ApiResponseCode success, String tag)> ExpectCallback;
 typedef std::function<apiframe(mesh_t::iterator pNode)> RequestBuilderCallback;
 typedef std::map<uint32_t, SmkNode>::iterator NodeIterator_t;
 typedef std::vector<NodeIterator_t> PollingNodeList_t;

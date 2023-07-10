@@ -67,11 +67,11 @@ smk900.enableAutomaticPolling();
 Callback function use for the automatic polling of all nodes define in nodes.json.  For parameters of this function, there is the node pointer to know who trigger the function, the packet received, if the response have been succesfully received or if the timeout have been triggered. It is possible as well to parse the raw data here if node type have been define. Automatic polling must be enable.
 
 ```c++
-void CallbackAutoPolling(mesh_t::iterator pNode, apiframe packet, bool success, String tag)
+void CallbackAutoPolling(mesh_t::iterator pNode, apiframe packet, ApiResponseCode success, String tag)
 {
 	//in case was unable to reach node, action can be done here
 	//payload contain nothing if unable to reach node
-	if(!success) 
+	if(success != ApiResponseCode::SUCCESS) 
 	{
 		Serial.println("Timeout: Unable to reach node");
 		return; //we quit here
@@ -160,9 +160,9 @@ if(p != smk900.nodes.pool.end())
 {
 	//build the api frame to send a command, when result will be received, it will triger the ExpectCallback function
 	apiframe vm_command = smk900.apiPacket(p, SMK_VM_EXEC, {0x60}, REMOTE);
-	smk900.addWriteExpect(p,vm_command, "status", ExpectCallback([](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
+	smk900.addWriteExpect(p,vm_command, "status", ExpectCallback([](mesh_t::iterator pNode, apiframe packet, ApiResponseCode success, String tag) -> void
 	{
-		if(!success)
+		if(success != ApiResponseCode::SUCCESS)
 		{
 			Serial.print("tag: ");
 			Serial.print(tag);

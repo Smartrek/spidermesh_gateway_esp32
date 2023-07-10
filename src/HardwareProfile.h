@@ -26,7 +26,7 @@
 
 #define SHOW_MIN_DEBUG false
 #define SHOW_WEB_SERVER_STATUS false
-#define SHOW_EXPECT_EVENT true
+#define SHOW_EXPECT_EVENT false
 #define SHOW_EXPECT_RESULT false
 #define SHOW_RECEIVED_BYTE_FROM_SMK900 false
 

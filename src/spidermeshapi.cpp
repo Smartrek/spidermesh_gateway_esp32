@@ -765,13 +765,13 @@ void SpidermeshApi::WriteAndExpectAnwser(  mesh_t::iterator pNode,
     {
         if ( i._pNode == pNode && i._request == request && i._tag == tag){
             found = true;
-            printf("%sFOUND%s", KRED, KNRM);
+            //printf("%sFOUND%s", KRED, KNRM);
             break;
         } 
     }
 
     #define MAX_EXPECT_LIST 10
-    if(1)//!found)
+    if(!found)
     {
         if(listOfExpectedAnswer.size() < MAX_EXPECT_LIST)
         {
@@ -810,19 +810,19 @@ void SpidermeshApi::CheckIfAnswerWasExpectedAndCallSuccessFunction(apiframe rxPk
             if(i->_request[3] == 0x0C ) expectRqType = i->_request[5] & 0x7F;
 
             //if packet is local
-            if(rxPkt[3] != PACKET_REMOTE_ANSWER)
+            if(rxPkt[3] != PACKET_REMOTE_ANSWER && i->_request[3] != 0x0C)
             {
                 if((expectRqType | 0x10) == rxPkt[3])
                 {
                     #if SHOW_EXPECT_EVENT
-                        Serial.println(" = expect local match found ");
+                        Serial.print(" = expect local match found ");
+                        Serial.println(macIntToString(i->_pNode->first));
                     #endif
-                        i->_expect_callback(i->_pNode, rxPkt, true, i->_tag);
+                        i->_expect_callback(i->_pNode, rxPkt, ApiResponseCode::SUCCESS, i->_tag);
                         i=listOfExpectedAnswer.erase(i);
                     #if SHOW_EXPECT_EVENT
                         Serial.println(" = callback done");
                     #endif
-    
                     break;
                 }
             }
@@ -856,7 +856,7 @@ void SpidermeshApi::CheckIfAnswerWasExpectedAndCallSuccessFunction(apiframe rxPk
                     #if SHOW_EXPECT_EVENT
                         Serial.println(" == expect match found");
                     #endif
-                        i->_expect_callback(i->_pNode, rxPkt, true, i->_tag);
+                        i->_expect_callback(i->_pNode, rxPkt, ApiResponseCode::SUCCESS, i->_tag);
                         i->_pNode->second.dataValid = 1;
                     #if SHOW_EXPECT_EVENT
                         Serial.println("  data validity TRUE  <----------" + i->_pNode->second.name);
@@ -867,11 +867,20 @@ void SpidermeshApi::CheckIfAnswerWasExpectedAndCallSuccessFunction(apiframe rxPk
                     //if mac is same, but packet isn't define, it must be a special request from user
                     else if(len == -1 )
                     {
-                        i->_expect_callback(i->_pNode, rxPkt, true, i->_tag);
+                        i->_expect_callback(i->_pNode, rxPkt, ApiResponseCode::SUCCESS, i->_tag);
                         i=listOfExpectedAnswer.erase(i);
                         break;
                     }
-                    
+                    //address match but length unexpected
+                    else 
+                    {
+                        #if SHOW_EXPECT_EVENT
+                            Serial.println("  node corrupted  <----------" + i->_pNode->second.name);
+                        #endif                        
+                        i->_expect_callback(i->_pNode, rxPkt, ApiResponseCode::CORRUPT, i->_tag);
+                        i=listOfExpectedAnswer.erase(i);
+                        break;
+                    }
                 }
             }
 
@@ -879,11 +888,6 @@ void SpidermeshApi::CheckIfAnswerWasExpectedAndCallSuccessFunction(apiframe rxPk
         }
     }
 }
-
-
-//rfPayloadToJsonFromPacket(i->_idx);
-
-
 
 //a chaque EOB, incrémente les compteur de EOB pour tout les nodes qui attende un message. 
 //si il a 2 EOB sans réponse, la meme requete peut etre envoyé de nouveau si le nombre de retry est >0
@@ -921,7 +925,7 @@ void SpidermeshApi::CheckExpectTimeout()
                 Serial.println("  data validity FALSE <---- " + i->_pNode->second.name);
                 #endif
                 i->_pNode->second.dataValid=0;
-                i->_expect_callback(i->_pNode, dummy, false, i->_tag);//if user want to do something
+                i->_expect_callback(i->_pNode, dummy, ApiResponseCode::TIMEOUT, i->_tag);//if user want to do something
 
                 i=listOfExpectedAnswer.erase(i);
             }
@@ -1131,7 +1135,7 @@ void SpidermeshApi::automaticNodePolling()
             //write the polling command 
 
             WriteAndExpectAnwser(pPoll, smkPacket, "status", cbAutomaticPolling);
-            if(pPoll->second.local)automaticNodePolling();
+            //if(pPoll->second.local)automaticNodePolling();
         }
         /*
         if(must_increase_polling_iterator)

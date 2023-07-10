@@ -55,11 +55,11 @@ void CallbackWhenPacketReceived(apiframe packet)
 
 //Definition of the callback function when automatic polling is enabled
 //when ever a node response is received or timeout, this function is call
-void CallbackAutoPolling(mesh_t::iterator pNode, apiframe packet, bool success, String tag)
+void CallbackAutoPolling(mesh_t::iterator pNode, apiframe packet, ApiResponseCode success, String tag)
 {
 	//in case was unable to reach node, action can be done here
 	//payload contain nothing if unable to reach node
-	if(!success) 
+	if(success != ApiResponseCode::SUCCESS) 
 	{
 		Serial.print("Timeout: Unable to reach node: ");
 		Serial.println(pNode->second.getMacAsString());
@@ -245,9 +245,9 @@ void loop()
 		{
 			//build the api frame to send a command, when result will be received, it will triger the ExpectCallback function
 			apiframe vm_command = smk900.apiPacket(p, SMK_VM_EXEC, {0x60}, REMOTE);
-			smk900.addWriteExpect(p,vm_command, "status", ExpectCallback([](mesh_t::iterator pNode, apiframe packet, bool success, String tag) -> void
+			smk900.addWriteExpect(p,vm_command, "status", ExpectCallback([](mesh_t::iterator pNode, apiframe packet, ApiResponseCode success, String tag) -> void
 			{
-				if(!success)
+				if(success != ApiResponseCode::SUCCESS)
 				{
 					Serial.print("tag: ");
 					Serial.print(tag);
