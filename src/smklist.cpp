@@ -55,30 +55,30 @@ mesh_t::iterator SmkList::addNode(JsonPair node)
     }
     if(j.containsKey("config"))
     {
-        Serial.printf("  %s",KRED);
+        //Serial.printf("  %s",KRED);
         int idx_reg = 0;
         for(auto y : j["config"].as<JsonArray>())
         {
 
             x.config.push_back(y.as<uint64_t>());
-            Serial.printf("cfg: %d ",y.as<uint64_t>());
+            //Serial.printf("cfg: %d ",y.as<uint64_t>());
         } 
-        Serial.print(KYEL);
-        Serial.println();
+        //Serial.print(KYEL);
+        //Serial.println();
     }
     else if((*type_json).containsKey(x.type))
     {
-        Serial.printf("%s type exist\n", KGRN);
+        //Serial.printf("%s type exist\n", KGRN);
         if((*type_json)[x.type].containsKey("config"))
         {
-            Serial.printf("%s config exist\n", KGRN);
+            //Serial.printf("%s config exist\n", KGRN);
 
             for(JsonObject c : (*type_json)[x.type]["config"].as<JsonArray>())
             {
                 for(JsonPair pair : c)
                 {
                   JsonObject cdetails = pair.value().as<JsonObject>();
-                  Serial.printf("%s name exist", pair.key());
+                  //Serial.printf("%s name exist", pair.key());
                   if(cdetails.containsKey("default"))
                     x.config.push_back(cdetails["default"].as<uint64_t>());
                   else

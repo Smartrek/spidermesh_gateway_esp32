@@ -22,14 +22,11 @@
 #define RTC_INIT_REASON true
 #define SMK900_ENABLED true
 
-
-
 #define SHOW_MIN_DEBUG false
 #define SHOW_WEB_SERVER_STATUS false
 #define SHOW_EXPECT_EVENT false
 #define SHOW_EXPECT_RESULT false
 #define SHOW_RECEIVED_BYTE_FROM_SMK900 false
-
 
 #define SHOW_TRANSMITED_PACKET_TO_SMK900 false
 
@@ -38,14 +35,11 @@
 #define SHOW_DEBUG_EXTRACT_DATA false
 #define SHOW_DEBUG_DICTIONARY false
 #define SHOW_DEBUG_DRIVE false
-#define SHOW_LOAD_NODE_DEBUG true
+#define SHOW_LOAD_NODE_DEBUG false
 
 #define RTC_ENABLED 0
 #define SD_CARD_ENABLED 0
 
-#define MQTT_PARSER_ENABLED true
-
-#define MIN_WEBOTA_REQUIRED false
 
 //-----------------------------------------------------
 
