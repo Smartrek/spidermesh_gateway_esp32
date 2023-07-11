@@ -1,5 +1,5 @@
 #include <parser.h>
-#define SHOW_DEBUG_EXTRACT_DATAJSON true
+#define SHOW_DEBUG_EXTRACT_DATAJSON false
 JsonObject SmkParser::type_json;
 
 bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payload, String &type, bool includeUnits)
