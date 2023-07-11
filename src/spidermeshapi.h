@@ -27,9 +27,7 @@
 
 #define DEFAULT_MAX_TRY_TO_SEND 2
 
-#if MQTT_PARSER_ENABLED
 #include <parser.h>
-#endif
 
 #define PORTIA_BAUDRATE 115200
 
