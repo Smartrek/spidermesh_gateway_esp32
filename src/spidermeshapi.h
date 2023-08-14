@@ -429,15 +429,15 @@ public:
 	static void WriteAndExpectAnwser(
 		mesh_t::iterator pNode, apiframe request,
 		uint8_t max_retry = 0, apiframe expectPayload = {}, int16_t size = -1, String tag="", 
-		ExpectCallback cb = [](mesh_t::iterator pNode, apiframe packet, ApiResponseCode success, String tag) -> void {});
+		ExpectCallback cb = [](mesh_t::iterator pNode, apiframe packet, ApiResponseCode success, String tag) -> bool {});
 
 	static void WriteAndExpectAnwser(
 		mesh_t::iterator pNode, apiframe request, String tag="",
-		ExpectCallback cb = [](mesh_t::iterator pNode, apiframe packet, ApiResponseCode success, String tag) -> void {});
+		ExpectCallback cb = [](mesh_t::iterator pNode, apiframe packet, ApiResponseCode success, String tag) -> bool {});
 
 	static void WriteAndExpectAnwser(
 		mesh_t::iterator pNode, apiframe request, uint8_t max_retry, String tag="",
-		ExpectCallback cb = [](mesh_t::iterator pNode, apiframe packet, ApiResponseCode success, String tag) -> void {});
+		ExpectCallback cb = [](mesh_t::iterator pNode, apiframe packet, ApiResponseCode success, String tag) -> bool {});
 
 	static void CheckIfAnswerWasExpectedAndCallSuccessFunction(apiframe rxPkt);
 	static void CheckExpectTimeout();

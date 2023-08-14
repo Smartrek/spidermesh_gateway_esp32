@@ -17,7 +17,7 @@ enum class ApiResponseCode
 };
 
 typedef std::map<uint32_t, SmkNode> mesh_t;
-typedef std::function<void(mesh_t::iterator pNode, apiframe packet, ApiResponseCode success, String tag)> ExpectCallback;
+typedef std::function<bool(mesh_t::iterator pNode, apiframe packet, ApiResponseCode success, String tag)> ExpectCallback;
 typedef std::function<apiframe(mesh_t::iterator pNode)> RequestBuilderCallback;
 typedef std::map<uint32_t, SmkNode>::iterator NodeIterator_t;
 typedef std::vector<NodeIterator_t> PollingNodeList_t;

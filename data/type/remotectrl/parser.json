@@ -1,46 +1,46 @@
 {
-    "name":"Remote Control",
-    "parser":
-    {
-      "status":{
-        "params":{
-          "RSSI":{"pos":[0,8]},
-          "Input CH1":{"pos":[8,1]},
-          "Input CH2":{"pos":[9,1]},
-          "Output CH1":{"pos":[12,1]},
-          "Force CFG":{"pos":[14,1]},
-          "Bypass":{"pos":[15,1]},
-          "Cur 1 max":{"pos":[16,16], "gain":0.07071,"u":"A"},
-          "Cur 2 max":{"pos":[32,16], "gain":0.07071,"u":"A"},
-          "Cur 1 act":{"pos":[48,24], "u":"A"},
-          "Cur 2 act":{"pos":[72,24], "u":"A"},
-          "Mech CT2":{"pos":[96,24], "u":"A"}
-          }
-      }
-    },
-    "config":[
-      {"XPCH1":{"pos":[0,1]}},
-      {"XPCH2":{"pos":[1,1]}},
-      {"Reset CT1":{"pos":[2,1]}},
-      {"Reset CT2":{"pos":[3,1]}},
-      {"Reset Mech":{"pos":[4,1]}},
-      {"Cur 1 HLimit":{"pos":[8,16], "gain":0.1, "u":"A", "fix":1}},
-      {"Cur 1 LLimit":{"pos":[24,8], "gain":0.39215687, "u":"A", "fix":1}},
-      {"Cur 2 HLimit":{"pos":[32,16], "gain":0.1, "u":"A", "fix":1}},
-      {"Cur 2 LLimit":{"pos":[48,8], "gain":0.39215687,"u":"A", "fix":1}},
-      {"Cur 1 Thr HLimit":{"pos":[56,8], "gain":-2, "offset":0.5, "u":"A", "fix":1}},
-      {"Cur 1 Thr LLimit":{"pos":[64,8], "gain":-2, "offset":0.5, "u":"A", "fix":1}},
-      {"Cur 2 Thr HLimit":{"pos":[72,8], "gain":-2, "offset":0.5, "u":"A", "fix":1}},
-      {"Cur 2 Thr LLimit":{"pos":[80,8], "gain":-2, "offset":0.5, "u":"A", "fix":1}},
-      {"Output 1 enable":{"pos":[88,1],"d":1}},
-      {"Output 2 enable":{"pos":[89,1],"d":1}},
-      {"Cur 1 enable":{"pos":[90,1]}},
-      {"Cur 2 enable":{"pos":[91,1]}},
-      {"Cur 1 CT enable":{"pos":[92,1]}},
-      {"Cur 2 CT enable":{"pos":[93,1]}},
-      {"Mech Switch CT2 enable":{"pos":[94,1]}},
-      {"Mech Switch enable":{"pos":[95,1],"d":1}},
-      {"Mech Switch Hi Thr":{"pos":[96,1]}},
-      {"Mech Switch Low Thr":{"pos":[97,1]}},
-      {"Mech Switch Sel":{"pos":[98,3]}}]
+  "name":"Remote Control",
+  "parser":
+  {
+    "status":{
+      "params":{
+        "RSSI":{"pos":[0,8]},
+        "Input CH1":{"pos":[8,1]},
+        "Input CH2":{"pos":[9,1]},
+        "Output CH1":{"pos":[12,1]},
+        "Force CFG":{"pos":[14,1]},
+        "Bypass":{"pos":[15,1]},
+        "Cur 1 max":{"pos":[16,16], "gain":0.07071,"u":"A"},
+        "Cur 2 max":{"pos":[32,16], "gain":0.07071,"u":"A"},
+        "Cur 1 act":{"pos":[48,24], "u":"A"},
+        "Cur 2 act":{"pos":[72,24], "u":"A"},
+        "Mech CT2":{"pos":[96,24], "u":"A"}
+        }
+    }
+  },
+  "config":[
+    {"XPCH1":{"pos":[0,1],"default":1}},
+    {"XPCH2":{"pos":[1,1],"default":1}},
+    {"Reset CT1":{"pos":[2,1]}},
+    {"Reset CT2":{"pos":[3,1]}},
+    {"Reset Mech":{"pos":[4,1]}},
+    {"Cur 1 HLimit":{"pos":[8,16], "gain":0.1, "u":"A", "fix":1}},
+    {"Cur 1 LLimit":{"pos":[24,8], "gain":0.39215687, "u":"A", "fix":1}},
+    {"Cur 2 HLimit":{"pos":[32,16], "gain":0.1, "u":"A", "fix":1}},
+    {"Cur 2 LLimit":{"pos":[48,8], "gain":0.39215687,"u":"A", "fix":1}},
+    {"Cur 1 Thr HLimit":{"pos":[56,8], "gain":-2, "offset":0.5, "u":"A", "fix":1}},
+    {"Cur 1 Thr LLimit":{"pos":[64,8], "gain":-2, "offset":0.5, "u":"A", "fix":1}},
+    {"Cur 2 Thr HLimit":{"pos":[72,8], "gain":-2, "offset":0.5, "u":"A", "fix":1}},
+    {"Cur 2 Thr LLimit":{"pos":[80,8], "gain":-2, "offset":0.5, "u":"A", "fix":1}},
+    {"Output 1 enable":{"pos":[88,1],"default":1}},
+    {"Output 2 enable":{"pos":[89,1],"default":1}},
+    {"Cur 1 enable":{"pos":[90,1],"default":1}},
+    {"Cur 2 enable":{"pos":[91,1],"default":1}},
+    {"Cur 1 CT enable":{"pos":[92,1],"default":1}},
+    {"Cur 2 CT enable":{"pos":[93,1],"default":1}},
+    {"Mech Switch CT2 enable":{"pos":[94,1]}},
+    {"Mech Switch enable":{"pos":[95,1],"default":1}},
+    {"Mech Switch Hi Thr":{"pos":[96,1]}},
+    {"Mech Switch Low Thr":{"pos":[97,1]}},
+    {"Mech Switch Sel":{"pos":[98,3]}}]
 }
