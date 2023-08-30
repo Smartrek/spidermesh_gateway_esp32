@@ -1,5 +1,5 @@
 #include <parser.h>
-#define SHOW_DEBUG_EXTRACT_DATAJSON true
+#define SHOW_DEBUG_EXTRACT_DATAJSON false
 JsonObject SmkParser::type_json;
 
 bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payload, String &type, bool includeUnits)
@@ -102,14 +102,18 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 				if(stype=="float24") scaled_raw_data <<= 8;
 				float value = *((float*) (&scaled_raw_data));
 				key["value"] = value;
+				#if SHOW_DEBUG_EXTRACT_DATAJSON
 				Serial.printf("%f\n", value);
+				#endif
 			}
 			else if(stype == "int64")
 			{
 				char buffer[50];
 				sprintf(buffer, "%lld", scaled_raw_data);				
 				key["value"] = buffer;
+				#if SHOW_DEBUG_EXTRACT_DATAJSON
 				Serial.printf("%s\n", buffer);
+				#endif
 			}
 			else
 			{
@@ -126,7 +130,9 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 				if(stype=="float24") scaled_raw_data <<= 8;
 				float value = *((float*) (&scaled_raw_data));
 				payload[cur_variable.key()] = value;
+				#if SHOW_DEBUG_EXTRACT_DATAJSON
 				Serial.printf("%f\n", value);
+				#endif
 			}
 				
 			else if(stype == "int64")
@@ -134,7 +140,9 @@ bool SmkParser::rfPayloadToJson(apiframe &packet, String tag, JsonVariant payloa
 				char buffer[50];
 				sprintf(buffer, "%lld", scaled_raw_data);
 				payload[cur_variable.key()] = buffer;
+				#if SHOW_DEBUG_EXTRACT_DATAJSON
 				Serial.printf("%s\n", buffer);
+				#endif
 			}
 			else
 			{
