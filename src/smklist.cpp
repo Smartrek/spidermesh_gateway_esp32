@@ -60,7 +60,7 @@ mesh_t::iterator SmkList::addNode(JsonPair node)
         for(auto y : j["config"].as<JsonArray>())
         {
 
-            x.config.push_back(y.as<uint64_t>());
+            x.config.push_back(y.as<int64_t>());
             //Serial.printf("cfg: %d ",y.as<uint64_t>());
         } 
         //Serial.print(KYEL);
@@ -80,7 +80,7 @@ mesh_t::iterator SmkList::addNode(JsonPair node)
                   JsonObject cdetails = pair.value().as<JsonObject>();
                   //Serial.printf("%s name exist", pair.key());
                   if(cdetails.containsKey("default"))
-                    x.config.push_back(cdetails["default"].as<uint64_t>());
+                    x.config.push_back(cdetails["default"].as<int64_t>());
                   else
                     x.config.push_back(0);
                 }
